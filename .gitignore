@@ -8,3 +8,5 @@ __pycache__/
 .pytest_cache/
 *.db*
 .DS_Store
+# Local duplicate checkout; the application repository lives at this root.
+/market-news-radar/

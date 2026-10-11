@@ -6,6 +6,7 @@ lb_tokens
 __pycache__
 .pytest_cache
 .git
+market-news-radar
 *.db
 *.db-shm
 *.db-wal
