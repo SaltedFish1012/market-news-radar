@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+data
+lb_tokens
+__pycache__
+.pytest_cache
+.git
+*.db
+*.db-shm
+*.db-wal

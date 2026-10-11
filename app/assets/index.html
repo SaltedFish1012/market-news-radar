@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light"><title>Market Radar · 市场研究工作台</title>
+  <link rel="stylesheet" href="/assets/dashboard.css">
+  <script src="/assets/navigation.js" defer></script>
+  <script src="/assets/dashboard.js" defer></script>
+  <script src="/assets/settings.js" defer></script>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="Market Radar 首页"><span class="brand-mark">m<span>r</span></span><span>market radar<small>市场研究工作台</small></span></a>
+    <div class="sidebar-label">WORKSPACE</div>
+    <nav aria-label="工作台导航">
+      <a class="nav-item active" data-section="marketSection" href="/"><span>◫</span> 市场总览 <i>01</i></a>
+      <a class="nav-item" data-section="strategySection" href="/strategies"><span>⌁</span> 策略与回测 <i>02</i></a>
+      <a class="nav-item" data-section="newsPanel" href="/news"><span>▤</span> 新闻中心 <i>03</i></a>
+      <a class="nav-item" data-section="alertsSection" href="/alerts"><span>◎</span> 预警记录 <i>04</i></a>
+      <a class="nav-item" data-section="sourcesSection" href="/sources"><span>⊙</span> 数据连接 <i>05</i></a>
+      <a class="nav-item" data-section="settingsSection" href="/settings"><span>⚙</span> 设置 <i>06</i></a>
+    </nav>
+    <div class="sidebar-note"><span class="tiny-label">RESEARCH FIRST</span><h3>从消息到市场。</h3><p>把新闻、价格和策略放在同一个视野里。</p><div class="note-art" aria-hidden="true"><b></b><b></b><b></b><b></b><b></b><b></b></div></div>
+    <div class="sidebar-bottom"><span class="status-dot" id="connectionDot"></span><span id="connectionText">等待连接</span><small>v0.3</small></div>
+  </aside>
+  <main>
+    <header class="topbar"><div class="breadcrumb" id="breadcrumb">工作台 <span>/</span> 美股市场</div><div class="top-actions"><span id="clock" class="clock"></span><button id="refreshBtn" class="button subtle">↻ 刷新数据</button><button id="logoutBtn" class="avatar" title="退出登录" aria-label="退出登录">MR</button></div></header>
+    <div class="page-content"><div id="globalError" class="banner error" hidden role="alert"></div><div id="workspaceView"><div id="marketView" data-page="market">
+      <section class="page-heading"><div><div class="eyebrow">MARKET OVERVIEW</div><h1>每一个波动，都有值得研究的线索<span>.</span></h1><p>查看行情，追踪新闻，用数据检验你的策略。</p></div><div class="market-tag"><span class="status-dot"></span> 美股研究 <small>USD</small></div></section>
+      <div id="demoBanner" class="banner demo" hidden>演示模式 · 当前价格、K 线和回测使用合成数据；新闻流仍来自已采集的真实来源。</div>
+      <section class="summary-grid" aria-label="工作台统计">
+        <article class="summary-card"><span>自选股票 <i>↗</i></span><strong id="watchCount">—</strong><small>你的市场观察清单</small></article>
+        <article class="summary-card"><span>新闻快照 <i>▤</i></span><strong id="newsCount">—</strong><small>最近载入的新闻数量</small></article>
+        <article class="summary-card"><span>策略库 <i>⌁</i></span><strong>05 <em>个</em></strong><small>透明规则 · 可运行回测</small></article>
+        <article class="summary-card"><span>数据连接 <i>⊙</i></span><strong id="sourceCount">—</strong><small id="sourceSummary">正在读取数据源状态</small></article>
+      </section>
+      <section id="marketSection" class="market-layout">
+        <aside class="panel watch-panel"><div class="panel-title"><h2>自选列表</h2><span class="small-muted">WATCHLIST</span></div><form id="symbolForm" class="symbol-search"><span>⌕</span><input id="symbolInput" aria-label="查询股票代码" placeholder="查询股票代码，如 AAPL" maxlength="10" autocomplete="off"><button type="submit" aria-label="查询股票">↗</button></form><div class="watch-head"><span>股票 / 公司</span><span>价格 / 日变动</span></div><div id="watchlist" class="watch-list"><div class="empty-state">登录后载入自选股票</div></div><div class="watch-foot">日变动按前一根日线收盘价计算。<br>公共行情不保证实时。</div></aside>
+        <article class="panel chart-panel">
+          <div class="chart-heading"><div><div class="symbol-line"><h2 id="selectedSymbol">NVDA</h2><span id="exchangeBadge" class="badge">US</span><span id="stockName" class="small-muted">等待行情</span></div><div class="quote-line"><strong id="stockPrice">—</strong><span id="stockChange">—</span></div><div class="quote-meta" id="quoteMeta">尚未载入行情</div></div><select id="providerSelect" aria-label="行情数据源"><option value="yahoo">公共行情 · Yahoo</option><option value="alpaca">Alpaca · IEX</option><option value="demo">演示 · 合成数据</option></select></div>
+          <div class="chart-toolbar"><div class="segmented" id="intervals" aria-label="K 线周期"><button data-interval="5m">5 分钟</button><button data-interval="1h">1 小时</button><button data-interval="1d" class="active">日 K</button><button data-interval="1wk">周 K</button></div><div class="indicator-controls"><button class="indicator active" id="emaToggle" aria-pressed="true"><i class="ema-dot"></i> EMA</button><button class="indicator" id="bbToggle" aria-pressed="false">布林带</button><button class="indicator active" id="rsiToggle" aria-pressed="true">RSI</button></div></div>
+          <div id="ohlc" class="ohlc">O — &nbsp; H — &nbsp; L — &nbsp; C — &nbsp; V —</div>
+          <div class="canvas-wrap"><canvas id="priceChart" aria-label="股票 K 线、成交量和技术指标图"></canvas><div id="chartMessage" class="chart-message">登录后载入真实 K 线</div></div>
+          <div class="chart-footer"><span id="dataSource">数据源 —</span><span>美东交易时间 · 滚轮缩放 / 拖动平移</span><button id="resetChart" title="重置图表范围">重置</button></div><div class="data-notice" id="dataNotice"></div>
+        </article>
+
+      </section>
+</div>
+<div id="strategyView" data-page="strategies" hidden><section class="page-heading"><div><div class="eyebrow">STRATEGY LAB</div><h1>策略与历史回测<span>.</span></h1><p>选择股票与周期，查看技术信号并检验历史表现。</p></div></section><form id="researchContextForm" class="panel research-context"><label>研究股票<input id="strategySymbolInput" value="NVDA" maxlength="10" placeholder="如 AAPL" autocomplete="off" required></label><label>K 线周期<select id="strategyInterval"><option value="5m">5 分钟</option><option value="1h">1 小时</option><option value="1d" selected>日 K</option><option value="1wk">周 K</option></select></label><label>行情源<select id="strategyProvider"><option value="yahoo">Yahoo 公共行情</option><option value="alpaca">Alpaca · IEX</option><option value="demo">演示 · 合成数据</option></select></label><button type="submit" class="button subtle">载入行情 ↗</button><span id="researchDataStatus" class="small-muted">等待载入研究数据</span></form>      <section id="strategySection" class="strategy-section"><div class="section-heading"><div><div class="eyebrow">STRATEGY LAB</div><h2>让想法，经得起数据检验。</h2></div><span id="strategyAsOf" class="small-muted">信号基于已收盘 K 线</span></div><div id="strategyCards" class="strategy-grid"></div>
+        <article class="panel backtest-panel"><div class="backtest-heading"><div><h2>历史回测 <span class="badge">LONG ONLY</span></h2><p>相同数据，明确成本，比较策略与买入持有。</p></div><div id="backtestContext" class="small-muted">NVDA · 日 K</div></div><form id="backtestForm" class="backtest-form"><label>策略<select id="strategySelect"></select></label><label>初始资金 · USD<input type="number" id="initialCash" value="10000" min="100" max="100000000" step="100" required></label><label>每边手续费 · bps<input type="number" id="feeBps" value="5" min="0" max="100" step="0.5" required></label><label>每边滑点 · bps<input type="number" id="slippageBps" value="5" min="0" max="100" step="0.5" required></label><button id="runBacktest" type="submit" class="button primary">运行回测 <span>↗</span></button></form><div id="backtestError" class="banner error" hidden role="alert"></div><div id="backtestEmpty" class="backtest-empty"><span>⌁</span><div><strong>选择策略，看看它在历史上如何表现。</strong><p>仅使用已收盘 K 线；信号在下一根开盘模拟成交。1 bps = 0.01%。</p></div></div><div id="backtestResults" hidden><div id="backtestMetrics" class="backtest-metrics"></div><div class="result-toolbar"><div class="segmented"><button type="button" id="equityTab" class="active">收益曲线</button><button type="button" id="tradesTab">成交记录</button></div><span id="backtestPeriod" class="small-muted"></span><button type="button" id="exportTrades" class="button subtle">↓ 导出成交 CSV</button></div><div id="equityView"><div class="chart-legend"><span><i class="legend-dot green"></i> 策略净值</span><span><i class="legend-dot gray"></i> 买入持有</span><span id="equityHover" class="small-muted"></span></div><canvas id="equityChart" aria-label="策略与买入持有的历史净值比较"></canvas></div><div id="tradesView" class="table-wrap" hidden></div><div id="backtestDetails" class="backtest-details"></div></div></article>
+      </section>
+</div>
+<div id="newsView" data-page="news" hidden><section class="page-heading"><div><div class="eyebrow">NEWS CENTER</div><h1>市场新闻中心<span>.</span></h1><p>按公司、主题和优先级筛选，保留每条消息的原始来源。</p></div></section><aside id="newsPanel" class="panel news-panel news-page"><div class="panel-title"><h2>市场新闻</h2><span class="live-label"><span class="status-dot"></span> RSS / 新闻流</span></div><div class="news-controls"><input id="newsSearch" aria-label="搜索新闻" placeholder="搜索标题、公司或主题…"><div><select id="newsSymbolSelect" aria-label="筛选关联股票"><option value="NVDA">NVDA</option></select><select id="newsFocus" aria-label="新闻关联范围"><option value="all">全部新闻</option><option value="stock">当前股票关联</option></select><select id="newsPriority" aria-label="新闻优先级"><option value="all">全部级别</option><option value="critical">高优先</option><option value="high">关注</option><option value="info">一般</option></select></div></div><div id="newsList" class="news-list"><div class="empty-state">登录后载入新闻</div></div><div class="panel-foot">保留原始来源 · 新闻时间以香港时间显示</div></aside></div>
+<div id="alertsView" data-page="alerts" hidden><section class="page-heading"><div><div class="eyebrow">ALERT HISTORY</div><h1>预警与通知记录<span>.</span></h1><p>查看新闻首报、价格异动和通知发送结果。</p></div></section>      <section id="alertsSection" class="panel lower-panel alerts-page"><div class="panel-title"><div><h2>预警记录</h2><p class="small-muted">新闻首报、行情异动与通知队列</p></div><button id="sendTestBtn" class="button subtle">发送测试提醒</button></div><div id="alertsList" class="alert-list"><div class="empty-state">等待载入</div></div></section>
+</div>
+<div id="sourcesView" data-page="sources" hidden><section class="page-heading"><div><div class="eyebrow">DATA CONNECTIONS</div><h1>数据连接状态<span>.</span></h1><p>检查各个数据源与模型服务的连接和更新情况。</p></div></section>      <section id="sourcesSection" class="panel lower-panel sources-page"><div class="panel-title"><div><h2>数据连接</h2><p class="small-muted">来源状态与最近更新时间</p></div><span class="badge">READ ONLY</span></div><div id="sourcesList" class="sources-grid"></div><p class="source-docs">公共行情用于本地研究；Alpaca IEX 需要密钥，长桥实时报价沿用原有接入。<a href="https://help.yahoo.com/kb/SLN2352.html" target="_blank" rel="noopener noreferrer">Yahoo 数据说明 ↗</a><a href="https://docs.alpaca.markets/us/reference/stockbarsingle-1" target="_blank" rel="noopener noreferrer">Alpaca 行情文档 ↗</a></p></section>
+</div>
+      <footer class="page-footer"><span>MARKET RADAR <b>·</b> 观察 / 分析 / 验证</span><span>历史回测是规则模拟，不代表未来收益。</span></footer>
+    </div><div id="settingsView" data-page="settings" hidden><section id="settingsSection" class="settings-section">
+  <div class="page-heading"><div><div class="eyebrow">WORKSPACE SETTINGS</div><h1>按你的方式，配置工作台<span>.</span></h1><p>管理模型、数据来源和预警规则，保存后即时应用。</p></div><span id="settingsSavedState" class="badge">正在读取设置</span></div>
+  <div id="settingsMessage" class="banner" hidden role="status"></div>
+  <form id="settingsForm" novalidate>
+    <div class="settings-toolbar"><div class="settings-tabs" role="tablist" aria-label="设置分类"><button type="button" class="active" data-settings-tab="ai" role="tab" aria-selected="true">AI 分析</button><button type="button" data-settings-tab="data" role="tab" aria-selected="false">行情与新闻</button><button type="button" data-settings-tab="notifications" role="tab" aria-selected="false">推送通知</button><button type="button" data-settings-tab="watchlist" role="tab" aria-selected="false">自选与规则</button></div><div class="settings-actions"><button type="button" id="reloadSettingsBtn" class="button subtle">重新载入</button><button id="saveSettingsBtn" type="submit" class="button primary" disabled>保存并应用 <span>↗</span></button></div></div>
+    <section class="panel settings-panel" data-settings-panel="ai" role="tabpanel">
+      <div class="settings-panel-heading"><div><h2>AI 新闻分析</h2><p>对高优先级新闻提供分析补充，保留原文和未核实状态。</p></div><label class="switch-label"><input type="checkbox" id="setting_ai_enabled"><span>启用 AI 分析</span></label></div>
+      <div class="settings-fields">
+        <label class="setting-field">模型供应商<select id="setting_ai_provider"></select><small>各供应商分别保存模型、接口地址和密钥。</small></label>
+        <label class="setting-field">AI Model<select id="setting_ai_model_preset"></select><small><a id="aiModelsDocs" href="https://ai.google.dev/gemini-api/docs/models" target="_blank" rel="noopener noreferrer">查看官方模型列表 ↗</a> · 实际可用性取决于账户。</small></label>
+        <label class="setting-field full-width" id="customModelField" hidden>自定义模型 ID<input id="setting_ai_model_custom" type="text" maxlength="150" placeholder="填写供应商提供的完整模型 ID"><small>兼容接口可使用 DeepSeek、OpenRouter 或本地模型的 ID。</small></label>
+        <label class="setting-field full-width">API Base URL<input id="setting_ai_base_url" type="text" maxlength="500" inputmode="url"><small id="aiProtocolHint">选择供应商后显示接口协议。</small></label>
+        <div class="setting-field full-width"><label for="setting_ai_key">API Key</label><input id="setting_ai_key" type="password" autocomplete="new-password" spellcheck="false" placeholder="输入当前供应商的 API Key"><div class="secret-controls"><span id="hint_ai_key">未配置</span><label><input id="clear_ai_key" type="checkbox">清除当前供应商已保存的 Key</label></div></div>
+        <label class="setting-field">每小时请求上限<input id="setting_ai_max_requests_per_hour" type="number" min="1" max="600" step="1"><small>1–600 次，连接测试也计入此上限。</small></label>
+        <label class="setting-field">请求超时 · 秒<input id="setting_ai_timeout_seconds" type="number" min="10" max="120" step="1"><small>10–120 秒，复杂推理模型可能需要更长时间。</small></label>
+      </div>
+      <div class="settings-test-row"><button type="button" id="testAiBtn" class="button subtle">测试 AI 连接 ↗</button><span>发送一条合成测试消息，可能产生一次模型调用费用；测试不会保存配置。</span></div><div id="settingsTestResult" class="settings-test-result" hidden role="status"></div>
+    </section>
+    <section class="panel settings-panel" data-settings-panel="data" role="tabpanel" hidden>
+      <div class="settings-panel-heading"><div><h2>行情与新闻</h2><p>选择默认行情源，管理新闻采集和更新频率。</p></div></div>
+      <div class="settings-fields">
+        <label class="setting-field">默认行情源<select id="setting_market_provider"><option value="yahoo">Yahoo 公共行情</option><option value="alpaca">Alpaca · IEX</option><option value="demo">演示 · 合成数据</option></select><small>用于登录后的默认 K 线和自选行情。</small></label>
+        <label class="setting-field">新闻有效期 · 分钟<input id="setting_news_max_age_minutes" type="number" min="1" max="1440" step="1"><small>过期新闻仍归档，但不触发突发预警。</small></label>
+        <label class="setting-field">RSS 采集间隔 · 秒<input id="setting_rss_interval" type="number" min="30" max="3600" step="1"><small>范围 30–3600 秒。</small></label>
+        <label class="setting-field">SEC 联系标识<input id="setting_sec_contact" type="text" maxlength="200" placeholder="MarketRadar your@email.com"><small>SEC 来源启用时需包含可联系邮箱。</small></label>
+      </div>
+      <div class="settings-subheading"><h3>Alpaca 新闻与行情</h3><label class="switch-label"><input id="setting_alpaca_news_enabled" type="checkbox"><span>订阅实时新闻</span></label></div>
+      <div class="settings-fields"><div class="setting-field"><label for="setting_alpaca_key">Alpaca API Key</label><input id="setting_alpaca_key" type="password" autocomplete="new-password"><div class="secret-controls"><span id="hint_alpaca_key">未配置</span><label><input id="clear_alpaca_key" type="checkbox">清除</label></div></div><div class="setting-field"><label for="setting_alpaca_secret">Alpaca Secret</label><input id="setting_alpaca_secret" type="password" autocomplete="new-password"><div class="secret-controls"><span id="hint_alpaca_secret">未配置</span><label><input id="clear_alpaca_secret" type="checkbox">清除</label></div></div><label class="setting-field full-width">新闻 WebSocket URL<input id="setting_alpaca_url" type="text" maxlength="500" inputmode="url"></label></div>
+      <details class="settings-details"><summary>长桥连接与授权</summary><p>OAuth 需先在本机完成授权；保存 Client ID 不等于已取得订阅权限。</p><div class="settings-toggle-row"><label class="switch-label"><input id="setting_lb_enabled" type="checkbox"><span>启用实时报价</span></label><label class="switch-label"><input id="setting_lb_news_enabled" type="checkbox"><span>启用个股新闻</span></label></div><div class="settings-fields"><label class="setting-field">OAuth Client ID<input id="setting_lb_client_id" type="text" maxlength="200"></label><label class="setting-field">个股新闻轮询间隔 · 秒<input id="setting_lb_news_interval" type="number" min="60" max="3600" step="1"></label><div class="setting-field"><label for="setting_lb_app_key">API App Key</label><input id="setting_lb_app_key" type="password" autocomplete="new-password"><div class="secret-controls"><span id="hint_lb_app_key">未配置</span><label><input id="clear_lb_app_key" type="checkbox">清除</label></div></div><div class="setting-field"><label for="setting_lb_app_secret">API App Secret</label><input id="setting_lb_app_secret" type="password" autocomplete="new-password"><div class="secret-controls"><span id="hint_lb_app_secret">未配置</span><label><input id="clear_lb_app_secret" type="checkbox">清除</label></div></div><div class="setting-field full-width"><label for="setting_lb_access_token">API Access Token</label><input id="setting_lb_access_token" type="password" autocomplete="new-password"><div class="secret-controls"><span id="hint_lb_access_token">未配置</span><label><input id="clear_lb_access_token" type="checkbox">清除</label></div></div></div></details>
+      <div class="settings-subheading"><div><h3>RSS / Atom 来源</h3><p>新来源第一次采集只归档已有文章。</p></div><button type="button" id="addFeedBtn" class="button subtle">＋ 添加来源</button></div><div id="settingsFeeds" class="settings-feed-list"></div>
+    </section>
+    <section class="panel settings-panel" data-settings-panel="notifications" role="tabpanel" hidden>
+      <div class="settings-panel-heading"><div><h2>推送通知</h2><p>配置 Telegram 或 Bark，也可以只在页面中查看预警。</p></div><label class="switch-label"><input id="setting_notifications_enabled" type="checkbox"><span>启用通知发送</span></label></div>
+      <p class="settings-inline-note">关闭发送时，预警继续保存在队列。启用有效通知渠道后，队列中的待发送预警会继续发送。</p>
+      <div class="settings-subheading"><h3>Telegram</h3></div><div class="settings-fields"><div class="setting-field"><label for="setting_telegram_token">Bot Token</label><input id="setting_telegram_token" type="password" autocomplete="new-password"><div class="secret-controls"><span id="hint_telegram_token">未配置</span><label><input id="clear_telegram_token" type="checkbox">清除</label></div></div><label class="setting-field">Chat ID<input id="setting_telegram_chat" type="text" maxlength="120" placeholder="填写接收消息的 Chat ID"><small>Bot Token 与 Chat ID 需要同时配置。</small></label></div>
+      <div class="settings-subheading"><h3>Bark · iPhone</h3></div><div class="settings-fields"><div class="setting-field"><label for="setting_bark_key">设备 Key</label><input id="setting_bark_key" type="password" autocomplete="new-password"><div class="secret-controls"><span id="hint_bark_key">未配置</span><label><input id="clear_bark_key" type="checkbox">清除</label></div></div><label class="setting-field">Bark 服务地址<input id="setting_bark_base" type="text" maxlength="500" inputmode="url"><small>支持默认服务或你的 HTTPS 自建服务。</small></label></div>
+    </section>
+    <section class="panel settings-panel" data-settings-panel="watchlist" role="tabpanel" hidden>
+      <div class="settings-panel-heading"><div><h2>自选股与关联规则</h2><p>设置研究范围、主题关键词和价格预警条件。</p></div></div>
+      <div class="settings-fields"><label class="setting-field full-width">自选股票 · 最多 20 只<textarea id="setting_symbols" rows="3" placeholder="NVDA, MU, WDC, SPY"></textarea><small>逗号或换行分隔，保存时统一转换为大写代码。</small></label><label class="setting-field full-width">新闻主题关键词<textarea id="setting_theme_keywords" rows="3" placeholder="OpenAI, semiconductor, CPI"></textarea><small>最多 100 个关键词，逗号或换行分隔。</small></label></div>
+      <div class="settings-subheading"><div><h3>价格预警规则</h3><p>股票须先加入自选列表；短时变动规则依赖长桥连续报价。</p></div><button type="button" id="addRuleBtn" class="button subtle">＋ 添加规则</button></div><div id="settingsPriceRules" class="settings-rule-list"></div>
+      <details class="settings-details"><summary>高级：公司与股票关联映射</summary><p>JSON 对象，每个公司名称对应股票代码数组。关联只表示可能的风险敞口。</p><textarea id="setting_company_map" rows="10" spellcheck="false" aria-label="公司与股票关联 JSON"></textarea></details>
+    </section>
+    <p class="settings-footnote">密钥输入留空会保留原值，清除需勾选对应选项。后台访问口令和数据库位置继续使用原有本地配置。</p>
+  </form>
+</section>
+</div>
+    </div>
+  </main>
+</div>
+<div id="authOverlay" class="auth-overlay"><form id="loginForm" class="login-card"><div class="brand-mark">m<span>r</span></div><div class="eyebrow">YOUR MARKET WORKSPACE</div><h2>进入你的市场工作台。</h2><p>输入本地 <code>.env</code> 中的 <code>DASHBOARD_TOKEN</code>。</p><label for="loginToken">后台访问口令</label><input id="loginToken" type="password" autocomplete="current-password" required placeholder="DASHBOARD_TOKEN"><label class="remember-login"><input id="rememberLogin" type="checkbox" checked><span>保持登录 · 30 天</span></label><div id="loginError" class="login-error" role="alert"></div><button id="loginBtn" class="button primary" type="submit">进入工作台 <span>↗</span></button><small>未勾选时使用最长 12 小时的临时会话。口令不会保存在浏览器中。</small></form></div>
+<div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "symbols": ["WDC", "SNDK", "MU", "NVDA", "AVGO", "AMD", "SPY", "QQQ", "SOXX"],
+  "theme_keywords": ["OpenAI", "Anthropic", "AI infrastructure", "AI spending", "Federal Reserve", "NVIDIA", "Micron", "SK Hynix", "Western Digital", "Sandisk", "semiconductor", "CPI", "nonfarm payrolls"],
+  "company_map": {
+    "openai": ["MSFT", "ORCL", "NVDA", "AVGO", "MU"],
+    "anthropic": ["AMZN", "GOOGL", "NVDA"],
+    "sk hynix": ["MU", "SNDK", "WDC"],
+    "nvidia": ["NVDA", "AVGO", "MU"],
+    "micron": ["MU", "SNDK", "WDC"],
+    "western digital": ["WDC", "SNDK"],
+    "sandisk": ["SNDK", "WDC"],
+    "broadcom": ["AVGO", "NVDA"],
+    "federal reserve": ["SPY", "QQQ", "SOXX"]
+  },
+  "price_rules": [
+    {"symbol": "WDC", "kind": "change_5m_below_pct", "value": -2.0, "cooldown_s": 600},
+    {"symbol": "MU", "kind": "change_5m_below_pct", "value": -2.0, "cooldown_s": 600},
+    {"symbol": "NVDA", "kind": "change_5m_below_pct", "value": -2.0, "cooldown_s": 600}
+  ]
+}

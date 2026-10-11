@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+data/
+lb_tokens/
+__pycache__/
+.venv/
+.pytest_cache/
+*.db*
+.DS_Store

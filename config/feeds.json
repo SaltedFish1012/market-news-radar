@@ -1,0 +1,5 @@
+[
+  {"name": "Federal Reserve Press", "url": "https://www.federalreserve.gov/feeds/press_all.xml", "enabled": true, "priority": "official"},
+  {"name": "SEC EDGAR Recent Filings", "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&count=100&output=atom", "enabled": true, "priority": "official", "needs_sec_contact": true},
+  {"name": "Google News - AI Industry", "url": "https://news.google.com/rss/search?q=OpenAI%20OR%20Anthropic%20OR%20semiconductor%20when%3A1d&hl=en-US&gl=US&ceid=US%3Aen", "enabled": true, "priority": "secondary"}
+]
