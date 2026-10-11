@@ -1,5 +1,7 @@
 # Market News Radar — 美股新闻与策略研究工作台
 
+产品概览 / Product overview：[中英双语产品介绍 / Bilingual introduction](PRODUCT.md)。
+
 仓库使用 Git Flow 分支约定：`main` 保存发布版本，`develop` 为开发集成分支。新功能从 `develop` 创建 `feature/*` 分支，通过 PR 合并；发布和紧急修复流程见 [开发规范](CONTRIBUTING.md)。GitHub Actions 会对主分支、开发分支及相关 PR 运行后端和前端 DOM 测试。
 
 ## v0.3 本地研究工作台
