@@ -89,6 +89,29 @@ class DB:
             self.conn.commit()
             return cur.lastrowid if cur.rowcount else None
 
+    def news_rows(self, *, limit: int, source_type: str = 'all') -> list[dict]:
+        if source_type not in ('all', 'news'):
+            raise ValueError('Invalid news source type')
+        where = " WHERE source_type != 'x'" if source_type == 'news' else ''
+        with self.lock:
+            return [dict(r) for r in self.conn.execute('SELECT * FROM news'+where+' ORDER BY id DESC LIMIT ?', (limit,))]
+
+    def x_posts(self, *, limit: int = 100, username: str | None = None) -> list[dict]:
+        where, args = "source_type='x'", []
+        with self.lock:
+            if username:
+                user = self.x_user(username)
+                if not user:
+                    return []
+                where += " AND CASE WHEN json_valid(x_metadata) THEN json_extract(x_metadata,'$.author_id') END = ?"
+                args.append(user['id'])
+            return [dict(r) for r in self.conn.execute('SELECT * FROM news WHERE '+where+' ORDER BY id DESC LIMIT ?',
+                                                      (*args, min(100, max(1, limit))))]
+
+    def x_accounts(self) -> list[dict]:
+        with self.lock:
+            return [json.loads(r[0]) for r in self.conn.execute('SELECT data FROM x_users ORDER BY user_id')]
+
     def x_user(self, username: str) -> dict | None:
         with self.lock:
             row = self.conn.execute('SELECT data FROM x_users JOIN x_user_aliases USING(user_id) WHERE username=?',

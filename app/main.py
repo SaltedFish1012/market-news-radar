@@ -21,7 +21,8 @@ from .market_sessions import Quote, quote_view
 from .engine import Engine, notification_loop
 from .feeds import rss_loop
 from .connectors import alpaca_news_loop,longbridge_quote_loop,longbridge_news_loop
-from .x_news import x_news_loop
+from .x_news import x_news_loop, XClient, XAPIError
+from .x_views import XPreviewRequest, preview_posts
 
 logging.basicConfig(level='INFO',format='%(asctime)s %(levelname)s %(name)s: %(message)s')
 # HTTP request logs can contain Telegram/Bark credentials in paths.
@@ -218,8 +219,29 @@ async def status(_auth=Depends(auth)):
         'ai':bool(settings.ai_enabled and settings.ai_key),'notifications':bool(settings.notifications_enabled and (settings.bark_key or (settings.telegram_token and settings.telegram_chat)))}}
 
 @app.get('/api/news')
-async def news(limit:int=Query(30,ge=1,le=200),_auth=Depends(auth)):
-    return {'items':engine.db.list_rows('news',limit)}
+async def news(limit:int=Query(30,ge=1,le=200),source_type:str=Query('all',pattern='^(all|news)$'),_auth=Depends(auth)):
+    return {'items':engine.db.news_rows(limit=limit,source_type=source_type)}
+
+@app.get('/api/x/posts')
+async def x_posts(limit:int=Query(100,ge=1,le=100),
+                  username:str|None=Query(None,pattern=r'^@?[A-Za-z0-9_]{1,15}$'),_auth=Depends(auth)):
+    return {'items':engine.db.x_posts(limit=limit,username=username),'accounts':engine.db.x_accounts()}
+
+@app.post('/api/x/preview')
+async def x_preview(body:XPreviewRequest,_auth=Depends(auth)):
+    if not settings.x_bearer_token:
+        return {'state':'not_configured','items':[], 'detail':'请在设置中配置 X Bearer Token 后测试读取。'}
+    client = XClient(settings.x_bearer_token)
+    try:
+        return await preview_posts(client,body.username)
+    except XAPIError as error:
+        details = {'authentication':'X Token 验证失败，请检查设置。','permission':'X 账号读取权限不足。',
+                   'billing':'X 读取额度或计费不可用。','rate_limit':'X 请求限流，请在重试时间后读取。',
+                   'not_found':'未找到这个 X 账号。','network':'X 网络请求失败。'}
+        return {'state':'error','items':[],'kind':error.kind,'retry_at':error.retry_at,
+                'detail':details.get(error.kind,'X 数据暂不可用，请稍后重试。')}
+    finally:
+        await client.close()
 
 @app.get('/api/alerts')
 async def alerts(limit:int=Query(40,ge=1,le=200),_auth=Depends(auth)):
