@@ -65,7 +65,7 @@ test('Failed settings request shows an error and leaves Reload usable',async()=>
     }finally{app.dom.window.close();}
 });
 
-const pageCases=[['/','market','marketSection'],['/strategies','strategies','strategySection'],['/news','news','newsPanel'],['/alerts','alerts','alertsSection'],['/sources','sources','sourcesSection'],['/settings','settings','settingsSection']];
+const pageCases=[['/','market','marketSection'],['/strategies','strategies','strategySection'],['/news','news','newsPanel'],['/smart-money','smartMoney','smartMoneySection'],['/alerts','alerts','alertsSection'],['/sources','sources','sourcesSection'],['/settings','settings','settingsSection']];
 function visiblePage(document){const visible=[...document.querySelectorAll('[data-page]')].filter(page=>!page.hidden);assert.equal(visible.length,1);return visible[0].dataset.page;}
 for(const[path,page,section]of pageCases)test(`Direct ${path} displays only ${page} without section scrolling`,async()=>{
     const app=await workspace({url:'http://radar.test'+path});try{
