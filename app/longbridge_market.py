@@ -13,7 +13,7 @@ def decode_candlesticks(rows, instrument, interval, now):
         if interval in ('1d', '1wk'):
             session = 'regular'
         values.append({'time':_epoch(row.timestamp), **{k:getattr(row, k, None) for k in
-            ('open','high','low','close','volume')}, 'session':session})
+            ('open','high','low','close','volume')}, 'session':session, 'closed_at':None})
     return normalize_bars(values, interval, instrument=instrument, now=now)
 
 
@@ -47,4 +47,4 @@ async def longbridge_candles(settings, instrument, interval, session):
             'name':instrument.name, 'currency':instrument.currency, 'exchange':instrument.market,
             'price':bars[-1]['close'] if bars else None, 'quote_time':bars[-1]['time'] if bars else None,
             'is_demo':False, 'adjustment':'供应商原始 OHLC；日/周线常规时段',
-            'notice':'最近最多 1000 根 K 线，受账户权限和供应商历史范围限制；时段依据返回标签。'}
+            'notice':'最近最多 1000 根 K 线，受账户权限和供应商历史范围限制；时段依据返回标签。缺少当天实际闭市元数据，收盘时间标为未知；分钟线仅在名义周期结束后保守判定完成，末根信号可能延后。'}

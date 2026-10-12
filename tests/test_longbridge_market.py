@@ -39,3 +39,15 @@ def test_longbridge_history_sessions_and_limits(monkeypatch):
     with pytest.raises(MarketError) as error:
         asyncio.run(longbridge_candles(settings, resolve_instrument('NVDA'), '1d', 'regular'))
     assert 'SECRET' not in str(error.value)
+
+
+@pytest.mark.parametrize('start,end', [('2026-10-09T19:30:00+00:00','2026-10-09T20:00:00+00:00'),
+                                    ('2026-11-27T17:30:00+00:00','2026-11-27T18:00:00+00:00')])
+def test_longbridge_unknown_session_end_is_not_an_asserted_close(start, end):
+    from app.longbridge_market import decode_candlesticks
+    row=NS(timestamp=datetime.fromisoformat(start),open=10,high=12,low=9,close=11,volume=1,trade_session='Intraday')
+    now=datetime.fromisoformat(end).timestamp()+300
+    bar=decode_candlesticks([row],resolve_instrument('NVDA'),'1h',now)[0]
+    assert bar['closed_at'] is None
+    assert bar['complete'] is False  # Conservative until the nominal interval expires.
+    assert decode_candlesticks([row],resolve_instrument('NVDA'),'1h',now+3600)[0]['complete'] is True

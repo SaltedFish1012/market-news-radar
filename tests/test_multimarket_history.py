@@ -10,7 +10,7 @@ from app.market import MarketData, MarketError
 from app.strategies import indicators
 
 
-@pytest.mark.parametrize('symbol',['005930.KS','035720.KQ','7203.T','^N225','600519.SS','000001.SZ'])
+@pytest.mark.parametrize('symbol',['005930.KS','035900.KQ','7203.T','^N225','600519.SS','000001.SZ'])
 @pytest.mark.parametrize('interval',['5m','1h','1d','1wk'])
 def test_other_market_history_metadata_and_indicators(monkeypatch,symbol,interval):
     instrument = resolve_instrument(symbol)

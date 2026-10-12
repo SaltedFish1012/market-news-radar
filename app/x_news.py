@@ -6,6 +6,7 @@ import re
 import time
 import math
 from email.utils import parsedate_to_datetime
+from datetime import datetime
 import httpx
 from .settings_store import XAccount
 
@@ -168,7 +169,17 @@ async def poll_account(engine, client, account, *, now):
             await engine.ingest_x(post,account,silent=initial)
         state.update(batch_max_id=maximum,next_token=None if initial else (data.get('meta') or {}).get('next_token'),
                      last_success_at=now,failures=0,retry_at=0,error='')
-        if posts: state['last_post_at'] = posts[0].get('created_at')
+        latest, latest_at = state.get('last_post_at'), float('-inf')
+        for value in [latest, *(post.get('created_at') for post in posts)]:
+            try:
+                parsed = datetime.fromisoformat(value.replace('Z','+00:00'))
+                if parsed.tzinfo is None: continue
+                timestamp = parsed.timestamp()
+                if math.isfinite(timestamp) and timestamp > latest_at:
+                    latest, latest_at = value, timestamp
+            except (AttributeError, ValueError, TypeError, OverflowError, OSError):
+                continue
+        if latest_at != float('-inf'): state['last_post_at'] = latest
         if not state['next_token']:
             state.update(initialized=True,since_id=maximum,batch_since_id=None,batch_max_id=None)
         engine.db.save_x_cursor(user['id'],state)

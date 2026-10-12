@@ -77,3 +77,32 @@ def test_archive_failure_replays_the_page(tmp_path):
         assert engine.db.x_cursor('42')['since_id']=='20' and len(engine.db.list_rows('news'))==2
         await client.close()
     asyncio.run(run())
+
+
+def test_latest_post_time_never_moves_backwards_or_disappears(tmp_path):
+    from app.x_news import XClient,poll_account
+    engine=make_engine(tmp_path);engine.db.save_x_cursor('42',{'initialized':True,'since_id':'10'})
+    rounds=iter([
+        {'data':[{'id':'30','text':'new','created_at':'2026-10-12T10:00:00Z'}],'meta':{'next_token':'older'}},
+        {'data':[{'id':'20','text':'older','created_at':'2026-10-11T10:00:00Z'}]},
+        {'data':[{'id':'31','text':'invalid','created_at':'not a date'}]},
+        {'data':[{'id':'32','text':'missing'}]},
+        {'data':[{'id':'33','text':'offset','created_at':'2026-10-12T19:00:00+09:00'},
+                 {'id':'34','text':'newest','created_at':'2026-10-12T11:00:00Z'}]},
+        {'data':[]},
+    ])
+    def respond(request):
+        if '/by/username/' in request.url.path:return httpx.Response(200,json={'data':{'id':'42','username':'Example'}})
+        return httpx.Response(200,json=next(rounds))
+    async def run():
+        client=XClient('SECRET',httpx.MockTransport(respond));account={'username':'Example'}
+        for now in range(1000,1003):
+            await poll_account(engine,client,account,now=now)
+            assert engine.db.x_cursor('42')['last_post_at']=='2026-10-12T10:00:00Z'
+        await poll_account(engine,client,account,now=1003)
+        assert engine.db.x_cursor('42')['last_post_at']=='2026-10-12T11:00:00Z'
+        await poll_account(engine,client,account,now=1004)
+        assert engine.db.x_cursor('42')['last_post_at']=='2026-10-12T11:00:00Z'
+        assert engine.db.x_cursor('42')['since_id']=='34'
+        await client.close()
+    asyncio.run(run())

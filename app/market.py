@@ -26,6 +26,55 @@ class MarketError(Exception):
     pass
 
 
+async def alpaca_calendar(client, headers, rows, instrument):
+    """Use actual exchange dates/closures; never infer regular hours from the clock."""
+    zone = ZoneInfo(instrument.timezone)
+    dates = [datetime.fromtimestamp(row['time'], zone).date() for row in rows]
+    params = {'start':min(dates).isoformat(), 'end':max(dates).isoformat()}
+    try:
+        response = await client.get('https://paper-api.alpaca.markets/v2/calendar', params=params, headers=headers)
+        if response.status_code in (401, 403):
+            response = await client.get('https://api.alpaca.markets/v2/calendar', params=params, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        if not isinstance(data, list):
+            raise ValueError('invalid calendar')
+        periods = []
+        for day in data:
+            opening = datetime.fromisoformat(day['date']+'T'+day['open']).replace(tzinfo=zone)
+            closing = datetime.fromisoformat(day['date']+'T'+day['close']).replace(tzinfo=zone)
+            if opening >= closing:
+                raise ValueError('invalid calendar period')
+            periods.append({'start':opening.timestamp(), 'end':closing.timestamp()})
+        return {'regular':periods}
+    except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
+        raise MarketError('Alpaca 交易日历不可用，无法确认盘中分钟行情；请核查账户权限或切换数据源') from exc
+
+
+def alpaca_regular_bars(rows, interval, instrument, periods):
+    # Provider hours are clock-aligned and may mix premarket with the opening
+    # half hour. Build session-aligned hours from already filtered 5-minute bars.
+    daily = {datetime.fromtimestamp(p['start'],ZoneInfo(instrument.timezone)).date():p
+             for p in periods['regular']}
+    bars = normalize_bars(rows, '5m', instrument=instrument, periods=periods)
+    selected, groups = [], {}
+    for bar in bars:
+        period = daily.get(datetime.fromtimestamp(bar['time'],ZoneInfo(instrument.timezone)).date())
+        if not period or not period['start'] <= bar['time'] or bar['time']+300 > period['end']:
+            continue
+        if interval == '5m':
+            selected.append(bar)
+            continue
+        start = int(period['start'] + ((bar['time']-period['start'])//3600)*3600)
+        group = groups.get(start)
+        if group is None:
+            groups[start] = {**bar, 'time':start, 'closed_at':min(start+3600,period['end'])}
+        else:
+            group.update(high=max(group['high'],bar['high']), low=min(group['low'],bar['low']),
+                         close=bar['close'], volume=group['volume']+bar['volume'])
+    return selected if interval == '5m' else normalize_bars(list(groups.values()), '1h', instrument=instrument, periods=periods)
+
+
 def is_complete(timestamp: int, interval: str) -> bool:
     return bar_is_complete(timestamp,interval,resolve_instrument('NVDA'),None,time.time())
 
@@ -170,15 +219,17 @@ class MarketData:
         days = {'5m': 7, '1h': 90, '1d': 370, '1wk': 1850}[interval]
         end = datetime.now(timezone.utc) - timedelta(minutes=16)
         rows, page = [], None
+        instrument = self.instrument(symbol)
+        headers = {'APCA-API-KEY-ID':self.settings.alpaca_key, 'APCA-API-SECRET-KEY':self.settings.alpaca_secret}
         async with httpx.AsyncClient(timeout=18) as client:
             for _ in range(5):
-                params = {'timeframe': {'5m': '5Min', '1h': '1Hour', '1d': '1Day', '1wk': '1Week'}[interval],
+                params = {'timeframe': {'5m': '5Min', '1h': '5Min', '1d': '1Day', '1wk': '1Week'}[interval],
                           'start': (end - timedelta(days=days)).isoformat(), 'end': end.isoformat(),
                           'adjustment': 'all', 'feed': 'iex', 'limit': 10000, 'sort': 'asc'}
                 if page:
                     params['page_token'] = page
                 response = await client.get(f'https://data.alpaca.markets/v2/stocks/{symbol}/bars', params=params,
-                    headers={'APCA-API-KEY-ID': self.settings.alpaca_key, 'APCA-API-SECRET-KEY': self.settings.alpaca_secret})
+                    headers=headers)
                 response.raise_for_status()
                 data = response.json()
                 rows.extend({'time': int(datetime.fromisoformat(b['t'].replace('Z', '+00:00')).timestamp()),
@@ -187,12 +238,14 @@ class MarketData:
                 page = data.get('next_page_token')
                 if not page:
                     break
-        bars = normalize_bars([{**row,'session':'regular'} for row in rows], interval, instrument=self.instrument(symbol))
+            periods = await alpaca_calendar(client,headers,rows,instrument) if rows and interval in ('5m','1h') else None
+        bars = alpaca_regular_bars(rows,interval,instrument,periods) if periods is not None else normalize_bars(
+            [{**row,'session':'regular'} for row in rows],interval,instrument=instrument)
         return {'bars': bars, 'provider': 'alpaca', 'source': 'Alpaca · IEX', 'is_demo': False,
                 'name': NAMES.get(symbol, symbol), 'currency': 'USD', 'exchange': 'IEX',
                 'price': bars[-1]['close'] if bars else None, 'quote_time': bars[-1]['time'] if bars else None,
                 'adjustment': 'Alpaca all adjustment',
-                'notice': 'IEX 单一交易所数据，非全市场成交量；查询结束时间保守滞后 16 分钟。'}
+                'notice': 'IEX 单一交易所数据，非全市场成交量；查询结束时间保守滞后 16 分钟。分钟线按官方交易日历排除延长时段，小时线从盘中 5 分钟数据合成，按开盘时间对齐。'}
 
     def _demo(self, symbol, interval):
         seed = int(hashlib.sha256((symbol + interval).encode()).hexdigest()[:16], 16)
