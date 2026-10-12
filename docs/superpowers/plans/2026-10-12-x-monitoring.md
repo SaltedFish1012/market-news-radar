@@ -119,7 +119,7 @@ assert len(engine.db.due_alerts()) == 1 and engine.db.due_alerts()[0]['title'] =
 - Produces `XClient(token: str, transport: httpx.AsyncBaseTransport | None = None)`、`async resolve_user(username: str) -> dict`、`async fetch_posts(user_id: str, account: dict, *, since_id: str | None, next_token: str | None, max_results: int) -> dict`（methods）；`async poll_account(engine: object, client: XClient, account: dict, *, now: float) -> None`。
 - `XAPIError(kind: str, status_code: int | None, retry_at: float | None)` 提供无秘密错误；transport 注入仅测试，基础 URL 固定 `https://api.x.com`，不由用户配置。
 
-- [ ] **Step 1: 添加失败测试 `test_first_snapshot_is_silent_and_initialized_on_success`、`test_five_page_batch_resumes_without_gaps`、`test_failure_restarts_uncommitted_page`、`test_invalid_page_token_replays_batch`、`test_post_expansions_and_renamed_author`。** 首次 max_results=10，失败不 initialized，空成功页 initialized；正常 max_results=100，一轮第 5 页仍有 token 时 since_id 不前进，重启继续第 6 页；整数 ID `'9'/'10'` 取 10；中途 ingest 失败不提交该页进度，重试不重复通知；分页 token 失效清 token、从 batch_since_id 重放而非跳到 batch_max_id。回复/转帖开关参数及本地类型过滤生效，优先 note_post（兼容旧响应 note_tweet）长正文，引用作者不混同；请求字段采用当前官方 post.fields，不混用旧字段参数。
+- [x] **Step 1: 添加失败测试 `test_first_snapshot_is_silent_and_initialized_on_success`、`test_five_page_batch_resumes_without_gaps`、`test_failure_restarts_uncommitted_page`、`test_invalid_page_token_replays_batch`、`test_post_expansions_and_renamed_author`。** 首次 max_results=10，失败不 initialized，空成功页 initialized；正常 max_results=100，一轮第 5 页仍有 token 时 since_id 不前进，重启继续第 6 页；整数 ID `'9'/'10'` 取 10；中途 ingest 失败不提交该页进度，重试不重复通知；分页 token 失效清 token、从 batch_since_id 重放而非跳到 batch_max_id。回复/转帖开关参数及本地类型过滤生效，优先 note_post（兼容旧响应 note_tweet）长正文，引用作者不混同；请求字段采用当前官方 post.fields，不混用旧字段参数。
 
 ```python
 # test_first_snapshot_is_silent_and_initialized_on_success
@@ -131,10 +131,10 @@ assert engine.db.x_cursor('42')['next_token'] == 'page-six'
 # test_post_expansions_and_renamed_author
 assert 'note_post' in captured_request.url.params['post.fields']
 ```
-- [ ] **Step 2: 运行失败验证。** `.\.venv\Scripts\python.exe -m pytest tests/test_x_polling.py -q`。
-- [ ] **Step 3: 实现官方请求与解析。** 按 [当前用户帖子接口](https://docs.x.com/x-api/users/get-posts) 使用 `post.fields=created_at,text,note_post,edit_controls`、`expansions=author_id,referenced_posts,edit_history_post_ids`、`user.fields=id,name,username`；初始用户名查询为 `/2/users/by/username/{username}`。解析器兼容响应的 referenced_posts/referenced_tweets、edit_history_post_ids/edit_history_tweet_ids、includes.posts/includes.tweets、note_post/note_tweet，并统一为内部字段；不把旧 response alias 当成当前可请求参数。优先返回长正文，编辑时间缺失时记录本地更新接收时间并说明语义。Token 仅 Authorization，不记录请求 headers。使用稳定 ID 持久 user，响应可含 partial errors，只有完整成功页才提交进度。归档逐帖 await 成功后保存 token/max ID；整批无 next_token 才推进 since_id。query_fingerprint 改变时保留完成游标，清中断批次 token 并从 batch_since_id 重放，防止新参数与旧 token 混用；首次快照永不沿 next_token 回补旧历史。
-- [ ] **Step 4: 重跑上述命令及 `tests/test_x_pipeline.py tests/test_x_storage.py`。** 预期 PASS，全用 MockTransport 和临时数据库。
-- [ ] **Step 5: 提交任务文件。** `git commit -m "feat: poll official X timelines with resumable pagination"`。
+- [x] **Step 2: 运行失败验证。** `.\.venv\Scripts\python.exe -m pytest tests/test_x_polling.py -q`。
+- [x] **Step 3: 实现官方请求与解析。** 按 [当前用户帖子接口](https://docs.x.com/x-api/users/get-posts) 使用 `post.fields=created_at,text,note_post,edit_controls`、`expansions=author_id,referenced_posts,edit_history_post_ids`、`user.fields=id,name,username`；初始用户名查询为 `/2/users/by/username/{username}`。解析器兼容响应的 referenced_posts/referenced_tweets、edit_history_post_ids/edit_history_tweet_ids、includes.posts/includes.tweets、note_post/note_tweet，并统一为内部字段；不把旧 response alias 当成当前可请求参数。优先返回长正文，编辑时间缺失时记录本地更新接收时间并说明语义。Token 仅 Authorization，不记录请求 headers。使用稳定 ID 持久 user，响应可含 partial errors，只有完整成功页才提交进度。归档逐帖 await 成功后保存 token/max ID；整批无 next_token 才推进 since_id。query_fingerprint 改变时保留完成游标，清中断批次 token 并从 batch_since_id 重放，防止新参数与旧 token 混用；首次快照永不沿 next_token 回补旧历史。
+- [x] **Step 4: 重跑上述命令及 `tests/test_x_pipeline.py tests/test_x_storage.py`。** 预期 PASS，全用 MockTransport 和临时数据库。
+- [x] **Step 5: 提交任务文件。** `git commit -m "feat: poll official X timelines with resumable pagination"`。
 
 ## Task 5: 调度、退避、取消与状态 API
 
