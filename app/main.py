@@ -425,6 +425,7 @@ WORKSPACE_PAGES = {
     'market': ('/', 'marketSection', '市场总览'),
     'strategies': ('/strategies', 'strategySection', '策略与回测'),
     'news': ('/news', 'newsPanel', '新闻中心'),
+    'smartMoney': ('/smart-money','smartMoneySection','聪明钱'),
     'alerts': ('/alerts', 'alertsSection', '预警记录'),
     'sources': ('/sources', 'sourcesSection', '数据连接'),
     'settings': ('/settings', 'settingsSection', '设置'),
@@ -434,7 +435,7 @@ WORKSPACE_PAGES = {
 def render_dashboard(page='market'):
     _, section, label = WORKSPACE_PAGES[page]
     html = (ASSETS / 'index.html').read_text(encoding='utf-8')
-    for filename in ('dashboard.css', 'navigation.js', 'dashboard.js', 'x_sidebar.js', 'settings.js'):
+    for filename in ('dashboard.css', 'navigation.js', 'dashboard.js', 'x_sidebar.js','smart_money.js', 'settings.js'):
         version = hashlib.sha256((ASSETS / filename).read_bytes()).hexdigest()[:12]
         html = html.replace(f'/assets/{filename}', f'/assets/{filename}?v={version}')
     html = re.sub(r'(<div id="[^"]+View" data-page="([^"]+)")(?: hidden)?(>)',
@@ -450,6 +451,7 @@ def render_dashboard(page='market'):
 
 
 @app.get('/settings', response_class=HTMLResponse)
+@app.get('/smart-money', response_class=HTMLResponse)
 @app.get('/strategies', response_class=HTMLResponse)
 @app.get('/news', response_class=HTMLResponse)
 @app.get('/alerts', response_class=HTMLResponse)

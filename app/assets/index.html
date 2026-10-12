@@ -7,6 +7,7 @@
   <script src="/assets/navigation.js" defer></script>
   <script src="/assets/dashboard.js" defer></script>
   <script src="/assets/x_sidebar.js" defer></script>
+  <script src="/assets/smart_money.js" defer></script>
   <script src="/assets/settings.js" defer></script>
 </head>
 <body>
@@ -18,9 +19,10 @@
       <a class="nav-item active" data-section="marketSection" href="/"><span>◫</span> 市场总览 <i>01</i></a>
       <a class="nav-item" data-section="strategySection" href="/strategies"><span>⌁</span> 策略与回测 <i>02</i></a>
       <a class="nav-item" data-section="newsPanel" href="/news"><span>▤</span> 新闻中心 <i>03</i></a>
-      <a class="nav-item" data-section="alertsSection" href="/alerts"><span>◎</span> 预警记录 <i>04</i></a>
-      <a class="nav-item" data-section="sourcesSection" href="/sources"><span>⊙</span> 数据连接 <i>05</i></a>
-      <a class="nav-item" data-section="settingsSection" href="/settings"><span>⚙</span> 设置 <i>06</i></a>
+      <a class="nav-item" data-section="smartMoneySection" href="/smart-money"><span>◇</span> 聪明钱 <i>04</i></a>
+      <a class="nav-item" data-section="alertsSection" href="/alerts"><span>◎</span> 预警记录 <i>05</i></a>
+      <a class="nav-item" data-section="sourcesSection" href="/sources"><span>⊙</span> 数据连接 <i>06</i></a>
+      <a class="nav-item" data-section="settingsSection" href="/settings"><span>⚙</span> 设置 <i>07</i></a>
     </nav>
     <div class="sidebar-note"><span class="tiny-label">RESEARCH FIRST</span><h3>从消息到市场。</h3><p>把新闻、价格和策略放在同一个视野里。</p><div class="note-art" aria-hidden="true"><b></b><b></b><b></b><b></b><b></b><b></b></div></div>
     <div class="sidebar-bottom"><span class="status-dot" id="connectionDot"></span><span id="connectionText">等待连接</span><small>v0.3</small></div>
@@ -58,12 +60,15 @@
 </div>
 <div id="sourcesView" data-page="sources" hidden><section class="page-heading"><div><div class="eyebrow">DATA CONNECTIONS</div><h1>数据连接状态<span>.</span></h1><p>检查各个数据源与模型服务的连接和更新情况。</p></div></section>      <section id="sourcesSection" class="panel lower-panel sources-page"><div class="panel-title"><div><h2>数据连接</h2><p class="small-muted">来源状态与最近更新时间</p></div><span class="badge">READ ONLY</span></div><div id="sourcesList" class="sources-grid"></div><p class="source-docs">公共行情用于本地研究；Alpaca IEX 需要密钥，长桥实时报价沿用原有接入。<a href="https://help.yahoo.com/kb/SLN2352.html" target="_blank" rel="noopener noreferrer">Yahoo 数据说明 ↗</a><a href="https://docs.alpaca.markets/us/reference/stockbarsingle-1" target="_blank" rel="noopener noreferrer">Alpaca 行情文档 ↗</a></p></section>
 </div>
+<div id="smartMoneyView" data-page="smartMoney" hidden><section class="page-heading"><div><div class="eyebrow">SEC DISCLOSURES</div><h1>追踪公开披露的持仓与交易<span>.</span></h1><p>机构季度持仓与内部人交易，保留日期、身份和官方原件。</p></div></section>
+ <section id="smartMoneySection" class="panel smart-money-panel"><div class="panel-title"><h2>聪明钱 · SEC 披露</h2><a href="/settings" data-section="settingsSection">配置来源 ↗</a></div><p class="smart-disclosure-note">13F 有披露延迟，展示的是报告期持仓差异，无法推断实际交易日期。Form 4 买卖、授予、行权、扣股缴税及赠与分别列示。发行人代码关联不代表各股类属于同一证券。</p><div id="smartMoneyTabs" class="settings-tabs" role="tablist" aria-label="聪明钱类别"><button type="button" data-smart-tab="holdings" class="active" role="tab" aria-selected="true">机构持仓 · 13F</button><button type="button" data-smart-tab="insiders" role="tab" aria-selected="false">内部人交易 · Form 4</button></div><div id="smartMoneyFilters" class="smart-filters"></div><p id="smartMoneyStatus" class="smart-status" role="status">登录后读取本地归档</p><div id="smartMoneyList"></div><div id="smartMoneyPagination" class="smart-pagination"></div></section>
+</div>
       <footer class="page-footer"><span>MARKET RADAR <b>·</b> 观察 / 分析 / 验证</span><span>历史回测是规则模拟，不代表未来收益。</span></footer>
-    </div><aside id="xSidebar" class="panel x-sidebar"><div class="panel-title"><h2>X 用户言论</h2><span class="badge">独立归档</span></div><div class="x-sidebar-controls"><select id="xAccountSelect" aria-label="选择 X 归档账号"><option value="">全部已归档账号</option></select><input id="xPostSearch" aria-label="搜索 X 账号或原文" placeholder="搜索账号或原文…"><p id="xArchiveStatus" class="small-muted">登录后载入独立归档</p></div><div id="xPostList" class="x-post-list"></div><div class="x-preview"><h3>测试读取账号</h3><input id="xPreviewUsername" aria-label="X 测试账号" value="aleabitoreddit" maxlength="16"><div class="x-preview-actions"><button id="xPreviewBtn" class="button subtle">测试读取</button><button id="xPreviewClearBtn" class="button subtle">清除测试结果</button></div><p id="xPricingHint" class="small-muted">官方读取可能收费；测试结果不归档、不推送。</p><p id="xPreviewStatus" class="small-muted" role="status"></p><div id="xPreviewList"></div></div></aside></div><div id="settingsView" data-page="settings" hidden><section id="settingsSection" class="settings-section">
+    </div><aside id="xSidebar" class="panel x-sidebar"><div class="panel-title"><h2>X 用户言论</h2><span class="badge">独立归档</span></div><div class="x-sidebar-controls"><select id="xAccountSelect" aria-label="选择 X 归档账号"><option value="">全部已归档账号</option></select><input id="xPostSearch" aria-label="搜索 X 账号或原文" placeholder="搜索账号或原文…"><p id="xArchiveStatus" class="small-muted">登录后载入独立归档</p></div><div id="xPostList" class="x-post-list"></div><div class="x-preview"><h3>测试读取账号</h3><input id="xPreviewUsername" aria-label="X 测试账号" value="aleabitoreddit" maxlength="16"><div class="x-preview-actions"><button id="xPreviewBtn" class="button subtle">测试读取</button><button id="xPreviewClearBtn" class="button subtle">清除测试结果</button></div><p id="xPricingHint" class="small-muted">官方读取可能收费；测试结果不归档、不推送。</p><p id="xPreviewStatus" class="small-muted" role="status"></p><div id="xPreviewList"></div></div><section id="smartMoneySummary" class="smart-summary" hidden></section></aside></div><div id="settingsView" data-page="settings" hidden><section id="settingsSection" class="settings-section">
   <div class="page-heading"><div><div class="eyebrow">WORKSPACE SETTINGS</div><h1>按你的方式，配置工作台<span>.</span></h1><p>管理模型、数据来源和预警规则，保存后即时应用。</p></div><span id="settingsSavedState" class="badge">正在读取设置</span></div>
   <div id="settingsMessage" class="banner" hidden role="status"></div>
   <form id="settingsForm" novalidate>
-    <div class="settings-toolbar"><div class="settings-tabs" role="tablist" aria-label="设置分类"><button type="button" class="active" data-settings-tab="ai" role="tab" aria-selected="true">AI 分析</button><button type="button" data-settings-tab="data" role="tab" aria-selected="false">行情与新闻</button><button type="button" data-settings-tab="notifications" role="tab" aria-selected="false">推送通知</button><button type="button" data-settings-tab="watchlist" role="tab" aria-selected="false">自选与规则</button></div><div class="settings-actions"><button type="button" id="reloadSettingsBtn" class="button subtle">重新载入</button><button id="saveSettingsBtn" type="submit" class="button primary" disabled>保存并应用 <span>↗</span></button></div></div>
+    <div class="settings-toolbar"><div class="settings-tabs" role="tablist" aria-label="设置分类"><button type="button" class="active" data-settings-tab="ai" role="tab" aria-selected="true">AI 分析</button><button type="button" data-settings-tab="data" role="tab" aria-selected="false">行情与新闻</button><button type="button" data-settings-tab="smartMoney" role="tab" aria-selected="false">聪明钱</button><button type="button" data-settings-tab="notifications" role="tab" aria-selected="false">推送通知</button><button type="button" data-settings-tab="watchlist" role="tab" aria-selected="false">自选与规则</button></div><div class="settings-actions"><button type="button" id="reloadSettingsBtn" class="button subtle">重新载入</button><button id="saveSettingsBtn" type="submit" class="button primary" disabled>保存并应用 <span>↗</span></button></div></div>
     <section class="panel settings-panel" data-settings-panel="ai" role="tabpanel">
       <div class="settings-panel-heading"><div><h2>AI 新闻分析</h2><p>对高优先级新闻提供分析补充，保留原文和未核实状态。</p></div><label class="switch-label"><input type="checkbox" id="setting_ai_enabled"><span>启用 AI 分析</span></label></div>
       <div class="settings-fields">
@@ -96,6 +101,12 @@
       </details>
 
       <div class="settings-subheading"><div><h3>RSS / Atom 来源</h3><p>新来源第一次采集只归档已有文章。</p></div><button type="button" id="addFeedBtn" class="button subtle">＋ 添加来源</button></div><div id="settingsFeeds" class="settings-feed-list"></div>
+    </section>
+    <section class="panel settings-panel" data-settings-panel="smartMoney" role="tabpanel" hidden>
+      <div class="settings-panel-heading"><div><h2>聪明钱 · SEC 披露采集</h2><p>官方 13F 机构持仓与 Form 4 内部人交易，归档后可在聪明钱页面查看。</p></div><label class="switch-label"><input id="setting_smart_money_enabled" type="checkbox"><span>启用采集</span></label></div>
+      <div class="settings-fields"><label class="setting-field">采集间隔 · 秒<input id="setting_smart_money_poll_interval" type="number" min="300" max="86400" value="900"><small>300–86400 秒，默认 900 秒。</small></label><p class="setting-field">联系邮箱复用“行情与新闻”中的 SEC 联系标识。未填写可联系邮箱时暂停采集，已归档披露仍可查看。</p></div>
+      <div class="settings-subheading"><h3>机构 · 最多 20 个</h3><div><button type="button" id="exampleInstitutionBtn" class="button subtle">加入 Berkshire 示例</button><button type="button" id="addInstitutionBtn" class="button subtle">＋ 添加机构</button></div></div><div id="settingsInstitutions"></div>
+      <div class="settings-fields"><label class="setting-field full-width">CUSIP → 标的代码 · JSON<textarea id="setting_smart_money_cusip_map" rows="5" spellcheck="false">{}</textarea><small>例：{"67066G104":"NVDA"}；未知 CUSIP 保留原证券信息，不猜测代码。</small></label><label class="setting-field full-width">标的代码 → 发行人 CIK · JSON<textarea id="setting_smart_money_issuer_map" rows="5" spellcheck="false">{}</textarea><small>例：{"NVDA":"1045810"}；美股股票优先使用 SEC 官方代码表精确匹配，未匹配时使用此覆盖。</small></label></div>
     </section>
     <section class="panel settings-panel" data-settings-panel="notifications" role="tabpanel" hidden>
       <div class="settings-panel-heading"><div><h2>推送通知</h2><p>配置 Telegram 或 Bark，也可以只在页面中查看预警。</p></div><label class="switch-label"><input id="setting_notifications_enabled" type="checkbox"><span>启用通知发送</span></label></div>
