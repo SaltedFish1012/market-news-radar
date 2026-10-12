@@ -221,7 +221,7 @@ assert.deepEqual(saved.watchlist.price_rules[0].sessions, ['overnight']);
 - Consumes US 四时段交付后的 `Instrument`、session K 线/API/页面。
 - Produces Yahoo `.KS/.KQ/.T/.SS/.SZ/^N225` 历史查询和配置市场的 AI 关联语义，不新增实时连接器。
 
-- [ ] **Step 1: 添加失败测试 `test_other_market_history_metadata_and_indicators`、`test_currency_mismatch_and_single_market_failure`、`test_ai_multimarket_symbol_validation`。** 模拟 005930.KS、035720.KQ、7203.T、^N225、600519.SS、000001.SZ；断言前导零和 URL 编码、KRW/JPY/CNY、对应 IANA timezone、5m/1h/1d/1wk 真实 bars 与指标；没有午休/假期 bars 时不补造；meta 币种与配置不符明确错误；API 一个市场失败不影响美股。AI 接受合法内部代码，拒绝路径注入；DOM 混合自选、市场错误和非 US 回测提示可见。
+- [x] **Step 1: 添加失败测试 `test_other_market_history_metadata_and_indicators`、`test_currency_mismatch_and_single_market_failure`、`test_ai_multimarket_symbol_validation`。** 模拟 005930.KS、035720.KQ、7203.T、^N225、600519.SS、000001.SZ；断言前导零和 URL 编码、KRW/JPY/CNY、对应 IANA timezone、5m/1h/1d/1wk 真实 bars 与指标；没有午休/假期 bars 时不补造；meta 币种与配置不符明确错误；API 一个市场失败不影响美股。AI 接受合法内部代码，拒绝路径注入；DOM 混合自选、市场错误和非 US 回测提示可见。
 
 ```python
 # test_other_market_history_metadata_and_indicators
@@ -231,10 +231,10 @@ assert len(korean['bars']) == len(provider_rows)  # 不补造交易日/午休
 # test_ai_multimarket_symbol_validation
 assert Analysis(**{**valid_analysis, 'affected_symbols':['005930.KS','^N225']}).affected_symbols == ['005930.KS','^N225']
 ```
-- [ ] **Step 2: 运行失败验证。** `.\.venv\Scripts\python.exe -m pytest tests/test_multimarket_history.py -q` 和 `node --test tests/frontend_market.test.cjs`。
-- [ ] **Step 3: 完成其他市场接入。** Yahoo 使用元数据与映射、market timezone 和供应商实际闭市信息；说明分钟历史范围和延迟，不对其他市场追加 `.US`。新闻关联共用 norm_symbol；AI 输入带配置市场/内部代码，提示不再限制美股，输出继续 schema 校验。示例/页面给出上述市场代码，但不自动改动用户自选或承诺当地新闻覆盖。
-- [ ] **Step 4: 重跑任务命令和 `tests/test_research.py tests/test_settings.py`。** 预期 PASS；其他市场只有历史行情和指标，成交回测仍明确受限。
-- [ ] **Step 5: 提交任务文件。** `git commit -m "feat: add Korean Japanese and Chinese historical markets"`。
+- [x] **Step 2: 运行失败验证。** `.\.venv\Scripts\python.exe -m pytest tests/test_multimarket_history.py -q` 和 `node --test tests/frontend_market.test.cjs`。
+- [x] **Step 3: 完成其他市场接入。** Yahoo 使用元数据与映射、market timezone 和供应商实际闭市信息；说明分钟历史范围和延迟，不对其他市场追加 `.US`。新闻关联共用 norm_symbol；AI 输入带配置市场/内部代码，提示不再限制美股，输出继续 schema 校验。示例/页面给出上述市场代码，但不自动改动用户自选或承诺当地新闻覆盖。
+- [x] **Step 4: 重跑任务命令和 `tests/test_research.py tests/test_settings.py`。** 预期 PASS；其他市场只有历史行情和指标，成交回测仍明确受限。
+- [x] **Step 5: 提交任务文件。** `git commit -m "feat: add Korean Japanese and Chinese historical markets"`。
 
 ## Task 9: 回归验收与交付记录
 
