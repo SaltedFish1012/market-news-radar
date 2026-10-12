@@ -397,7 +397,7 @@ WORKSPACE_PAGES = {
 def render_dashboard(page='market'):
     _, section, label = WORKSPACE_PAGES[page]
     html = (ASSETS / 'index.html').read_text(encoding='utf-8')
-    for filename in ('dashboard.css', 'navigation.js', 'dashboard.js', 'settings.js'):
+    for filename in ('dashboard.css', 'navigation.js', 'dashboard.js', 'x_sidebar.js', 'settings.js'):
         version = hashlib.sha256((ASSETS / filename).read_bytes()).hexdigest()[:12]
         html = html.replace(f'/assets/{filename}', f'/assets/{filename}?v={version}')
     html = re.sub(r'(<div id="[^"]+View" data-page="([^"]+)")(?: hidden)?(>)',
@@ -408,6 +408,7 @@ def render_dashboard(page='market'):
     html = html.replace('Market Radar · 市场研究工作台', label + ' · Market Radar')
     if page == 'settings':
         html = html.replace('id="workspaceView"', 'id="workspaceView" hidden')
+        html = html.replace('id="researchWorkspace"', 'id="researchWorkspace" hidden')
     return HTMLResponse(html, headers={'Cache-Control': 'no-store'})
 
 

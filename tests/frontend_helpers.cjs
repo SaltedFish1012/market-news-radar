@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory() as folder:
     print(json.dumps(SettingsStore(base).snapshot()))`);
 const pageHtml=projectJSON("import json;from app.main import render_dashboard,WORKSPACE_PAGES;print(json.dumps({data[0]:render_dashboard(key).body.decode() for key,data in WORKSPACE_PAGES.items()}))");
 const tick=()=>new Promise(resolve=>setTimeout(resolve,15));
-async function workspace({url='http://radar.test/settings',failed=false,authenticated=true,onLogin=()=>{},onMarket=()=>{},newsItems=[],marketResponse=null,backtestResponse=null,defaultProvider='yahoo',quoteItems=[],onRequest=null}={}){
+async function workspace({url='http://radar.test/settings',failed=false,authenticated=true,onLogin=()=>{},onMarket=()=>{},newsItems=[],xItems=[],xAccounts=[],marketResponse=null,backtestResponse=null,defaultProvider='yahoo',quoteItems=[],onRequest=null}={}){
     const errors=[];const console=new VirtualConsole();console.on('jsdomError',error=>errors.push(error));
     const dom=new JSDOM(pageHtml[new URL(url).pathname]||pageHtml['/'],{url,runScripts:'dangerously',virtualConsole:console,beforeParse(window){
         window.HTMLElement.prototype.scrollIntoView=function(){throw Error('Navigation must not scroll to a section');};window.scrollTo=options=>window.lastScroll=options;
@@ -26,6 +26,8 @@ async function workspace({url='http://radar.test/settings',failed=false,authenti
         window.fetch=async (path,options={})=>{
             if(onRequest){const custom=await onRequest(path,options);if(custom)return custom;}
             if(path==='/api/quotes')return{ok:true,status:200,json:async()=>({items:[],sessions:quoteItems})};
+            if(path.startsWith('/api/x/posts'))return{ok:true,status:200,json:async()=>({items:xItems,accounts:xAccounts})};
+            if(path==='/api/x/preview')return{ok:true,status:200,json:async()=>({state:'not_configured',items:[],detail:'请配置 X Bearer Token'})};
             if(path==='/api/session'&&options.method==='POST'){
                 onLogin(JSON.parse(options.body));authenticated=true;
                 return{ok:true,status:200,json:async()=>({authenticated:true})};
@@ -39,7 +41,7 @@ async function workspace({url='http://radar.test/settings',failed=false,authenti
             throw Error('Unexpected request '+path);
         };
     }});
-    for(const name of ['navigation.js','dashboard.js','settings.js']){const script=dom.window.document.createElement('script');script.textContent=fs.readFileSync(root+'/app/assets/'+name,'utf8');dom.window.document.body.appendChild(script);}
+    for(const name of ['navigation.js','dashboard.js','x_sidebar.js','settings.js']){if(!fs.existsSync(root+'/app/assets/'+name))continue;const script=dom.window.document.createElement('script');script.textContent=fs.readFileSync(root+'/app/assets/'+name,'utf8');dom.window.document.body.appendChild(script);}
     await tick();await tick();
     return{dom,window:dom.window,document:dom.window.document,errors};
 }

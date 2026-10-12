@@ -6,6 +6,7 @@
   <link rel="stylesheet" href="/assets/dashboard.css">
   <script src="/assets/navigation.js" defer></script>
   <script src="/assets/dashboard.js" defer></script>
+  <script src="/assets/x_sidebar.js" defer></script>
   <script src="/assets/settings.js" defer></script>
 </head>
 <body>
@@ -26,7 +27,7 @@
   </aside>
   <main>
     <header class="topbar"><div class="breadcrumb" id="breadcrumb">工作台 <span>/</span> 美股市场</div><div class="top-actions"><span id="clock" class="clock"></span><button id="refreshBtn" class="button subtle">↻ 刷新数据</button><button id="logoutBtn" class="avatar" title="退出登录" aria-label="退出登录">MR</button></div></header>
-    <div class="page-content"><div id="globalError" class="banner error" hidden role="alert"></div><div id="workspaceView"><div id="marketView" data-page="market">
+    <div class="page-content"><div id="globalError" class="banner error" hidden role="alert"></div><div id="researchWorkspace" class="research-workspace"><div id="workspaceView"><div id="marketView" data-page="market">
       <section class="page-heading"><div><div class="eyebrow">MARKET OVERVIEW</div><h1>每一个波动，都有值得研究的线索<span>.</span></h1><p>查看行情，追踪新闻，用数据检验你的策略。</p></div><div class="market-tag"><span class="status-dot"></span> 多市场研究 <small>历史行情</small></div></section>
       <div id="demoBanner" class="banner demo" hidden>演示模式 · 当前价格、K 线和回测使用合成数据；新闻流仍来自已采集的真实来源。</div>
       <section class="summary-grid" aria-label="工作台统计">
@@ -58,7 +59,7 @@
 <div id="sourcesView" data-page="sources" hidden><section class="page-heading"><div><div class="eyebrow">DATA CONNECTIONS</div><h1>数据连接状态<span>.</span></h1><p>检查各个数据源与模型服务的连接和更新情况。</p></div></section>      <section id="sourcesSection" class="panel lower-panel sources-page"><div class="panel-title"><div><h2>数据连接</h2><p class="small-muted">来源状态与最近更新时间</p></div><span class="badge">READ ONLY</span></div><div id="sourcesList" class="sources-grid"></div><p class="source-docs">公共行情用于本地研究；Alpaca IEX 需要密钥，长桥实时报价沿用原有接入。<a href="https://help.yahoo.com/kb/SLN2352.html" target="_blank" rel="noopener noreferrer">Yahoo 数据说明 ↗</a><a href="https://docs.alpaca.markets/us/reference/stockbarsingle-1" target="_blank" rel="noopener noreferrer">Alpaca 行情文档 ↗</a></p></section>
 </div>
       <footer class="page-footer"><span>MARKET RADAR <b>·</b> 观察 / 分析 / 验证</span><span>历史回测是规则模拟，不代表未来收益。</span></footer>
-    </div><div id="settingsView" data-page="settings" hidden><section id="settingsSection" class="settings-section">
+    </div><aside id="xSidebar" class="panel x-sidebar"><div class="panel-title"><h2>X 用户言论</h2><span class="badge">独立归档</span></div><div class="x-sidebar-controls"><select id="xAccountSelect" aria-label="选择 X 归档账号"><option value="">全部已归档账号</option></select><input id="xPostSearch" aria-label="搜索 X 账号或原文" placeholder="搜索账号或原文…"><p id="xArchiveStatus" class="small-muted">登录后载入独立归档</p></div><div id="xPostList" class="x-post-list"></div><div class="x-preview"><h3>测试读取账号</h3><input id="xPreviewUsername" aria-label="X 测试账号" value="aleabitoreddit" maxlength="16"><div class="x-preview-actions"><button id="xPreviewBtn" class="button subtle">测试读取</button><button id="xPreviewClearBtn" class="button subtle">清除测试结果</button></div><p id="xPricingHint" class="small-muted">官方读取可能收费；测试结果不归档、不推送。</p><p id="xPreviewStatus" class="small-muted" role="status"></p><div id="xPreviewList"></div></div></aside></div><div id="settingsView" data-page="settings" hidden><section id="settingsSection" class="settings-section">
   <div class="page-heading"><div><div class="eyebrow">WORKSPACE SETTINGS</div><h1>按你的方式，配置工作台<span>.</span></h1><p>管理模型、数据来源和预警规则，保存后即时应用。</p></div><span id="settingsSavedState" class="badge">正在读取设置</span></div>
   <div id="settingsMessage" class="banner" hidden role="status"></div>
   <form id="settingsForm" novalidate>
