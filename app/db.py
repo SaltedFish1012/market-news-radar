@@ -1,10 +1,13 @@
 """Small SQLite WAL store; all updates serialized across asyncio tasks using threading.Lock."""
 from __future__ import annotations
 import json
+import math
 import sqlite3
 from pathlib import Path
 from threading import RLock
 from datetime import datetime, timezone
+from .market_sessions import Quote
+from .instruments import resolve_instrument, SESSIONS
 
 
 def utcnow():
@@ -44,7 +47,21 @@ class DB:
             CREATE TABLE IF NOT EXISTS health (
               source TEXT PRIMARY KEY, state TEXT NOT NULL, detail TEXT NOT NULL,
               updated_at TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS session_quotes (
+              symbol TEXT NOT NULL, session TEXT NOT NULL, price REAL NOT NULL,
+              currency TEXT NOT NULL, source TEXT NOT NULL, quote_at REAL,
+              received_at REAL NOT NULL, trade_status TEXT NOT NULL,
+              PRIMARY KEY(symbol,session));
             ''')
+            for row in self.conn.execute('SELECT * FROM quotes').fetchall():
+                try:
+                    received = datetime.fromisoformat(row['observed_at']).timestamp()
+                    currency = resolve_instrument(row['symbol']).currency
+                except (ValueError, TypeError):
+                    received, currency = 0, 'USD'
+                self.conn.execute('''INSERT OR IGNORE INTO session_quotes
+                    VALUES (?, 'unknown', ?, ?, ?, NULL, ?, 'unknown')''',
+                    (row['symbol'], row['price'], currency, row['source'], received))
             self.conn.commit()
 
     def put_news(self, event: dict) -> int | None:
@@ -94,6 +111,36 @@ class DB:
              ON CONFLICT(symbol) DO UPDATE SET price=excluded.price,observed_at=excluded.observed_at,source=excluded.source''',
              (symbol,price,utcnow(),source))
             self.conn.commit()
+
+    def put_session_quote(self, quote: Quote) -> bool:
+        if (quote.session not in (*SESSIONS, 'unknown') or not math.isfinite(quote.price)
+                or quote.price <= 0 or not math.isfinite(quote.received_at)
+                or (quote.quote_at is not None and not math.isfinite(quote.quote_at))):
+            return False
+        with self.lock, self.conn:
+            cur = self.conn.execute('''INSERT INTO session_quotes VALUES (?,?,?,?,?,?,?,?)
+                ON CONFLICT(symbol,session) DO UPDATE SET price=excluded.price,
+                currency=excluded.currency, source=excluded.source, quote_at=excluded.quote_at,
+                received_at=excluded.received_at, trade_status=excluded.trade_status
+                WHERE (excluded.quote_at IS NOT NULL AND
+                       (session_quotes.quote_at IS NULL OR excluded.quote_at > session_quotes.quote_at))
+                   OR (excluded.quote_at IS NULL AND session_quotes.quote_at IS NULL
+                       AND excluded.received_at > session_quotes.received_at)''',
+                (quote.symbol,quote.session,quote.price,quote.currency,quote.source,
+                 quote.quote_at,quote.received_at,quote.trade_status))
+            if not cur.rowcount:
+                return False
+            latest = self.conn.execute('SELECT max(quote_at) FROM session_quotes WHERE symbol=?', (quote.symbol,)).fetchone()[0]
+            if latest is None or (quote.quote_at is not None and quote.quote_at >= latest):
+                self.conn.execute('''INSERT INTO quotes VALUES (?,?,?,?) ON CONFLICT(symbol)
+                    DO UPDATE SET price=excluded.price,observed_at=excluded.observed_at,source=excluded.source''',
+                    (quote.symbol,quote.price,datetime.fromtimestamp(quote.received_at,timezone.utc).isoformat(),quote.source))
+            return True
+
+    def session_quotes(self, symbol: str | None = None) -> list[dict]:
+        with self.lock:
+            sql = 'SELECT * FROM session_quotes' + (' WHERE symbol=?' if symbol else '') + ' ORDER BY symbol,session'
+            return [dict(r) for r in self.conn.execute(sql, (symbol,) if symbol else ())]
 
     def health(self, source: str, state: str, detail: str = ''):
         with self.lock:

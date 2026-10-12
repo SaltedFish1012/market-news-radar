@@ -80,7 +80,7 @@ assert normalize_symbol('../NVDA') == ''
 - Produces frozen `Quote(symbol: str, price: float, currency: str, source: str, session: str, quote_at: float | None, received_at: float, trade_status: str)`；`quote_is_eligible(quote: Quote) -> bool`；`quote_view(quote: Quote, now: float) -> dict`（含 `fresh` 和状态原因）；`reference_close(bars: list[dict], quote_at: float) -> dict | None`（返回 `price`、`closed_at`）。
 - `DB.put_session_quote(quote: Quote) -> bool` 原子拒绝同一 symbol/session 的重复或倒序时间；`DB.session_quotes(symbol: str | None = None) -> list[dict]` 返回完整字段。`DB.list_rows('quotes')` 和旧 `DB.quote` 保留兼容读取；未知时间旧数据不能触发预警。
 
-- [ ] **Step 1: 添加失败测试 `test_quote_freshness_boundaries`、`test_reference_close_has_no_future_data`、`test_repeatable_quote_migration_and_order`。** 使用固定时钟并断言：
+- [x] **Step 1: 添加失败测试 `test_quote_freshness_boundaries`、`test_reference_close_has_no_future_data`、`test_repeatable_quote_migration_and_order`。** 使用固定时钟并断言：
 
 ```python
 assert quote_is_eligible(Quote('NVDA', 100, 'USD', 'Longbridge OpenAPI', 'pre', 1000, 1120, 'normal'))
@@ -91,10 +91,10 @@ assert reference_close([{'session':'regular', 'complete':True, 'close':110, 'clo
 
 另外覆盖 `NaN`、无穷、负价、unknown、交易停牌；未来正好 5 秒可用；同秒修订不刷新预警；120 秒之后读取已过期；打开旧数据库两次保留新闻/预警/旧价且未知记录仅一份。
 
-- [ ] **Step 2: 运行失败验证。** `.\.venv\Scripts\python.exe -m pytest tests/test_market_sessions.py tests/test_quote_storage.py -q`；新增模型/方法未定义而失败。
-- [ ] **Step 3: 实现模型、边界判定和迁移。** 新增 `session_quotes`，主键 `(symbol, session)`；用条件 UPSERT 保证时间顺序。成功存储后，同一事务维护 `quotes` 兼容最新行，不能用较旧的另一时段快照覆盖较新的已知上游时间；兼容行的 observed_at 继续为 ISO 接收时间。迁移旧 quote 为 `unknown`，以原接收时间保留显示；没有上游时间保持 null。实时状态按读取时钟重新计算。可信基准只选已完成 regular bar 且 `closed_at <= quote_at` 的最后一根。
-- [ ] **Step 4: 重跑同一命令和 `tests/test_core.py`。** 预期 PASS，新闻/outbox 行为未变。
-- [ ] **Step 5: 提交任务文件。** `git commit -m "feat: persist session quotes with freshness checks"`。
+- [x] **Step 2: 运行失败验证。** `.\.venv\Scripts\python.exe -m pytest tests/test_market_sessions.py tests/test_quote_storage.py -q`；新增模型/方法未定义而失败。
+- [x] **Step 3: 实现模型、边界判定和迁移。** 新增 `session_quotes`，主键 `(symbol, session)`；用条件 UPSERT 保证时间顺序。成功存储后，同一事务维护 `quotes` 兼容最新行，不能用较旧的另一时段快照覆盖较新的已知上游时间；兼容行的 observed_at 继续为 ISO 接收时间。迁移旧 quote 为 `unknown`，以原接收时间保留显示；没有上游时间保持 null。实时状态按读取时钟重新计算。可信基准只选已完成 regular bar 且 `closed_at <= quote_at` 的最后一根。
+- [x] **Step 4: 重跑同一命令和 `tests/test_core.py`。** 预期 PASS，新闻/outbox 行为未变。
+- [x] **Step 5: 提交任务文件。** `git commit -m "feat: persist session quotes with freshness checks"`。
 
 ## Task 3: 长桥快照、推送和四时段预警
 
