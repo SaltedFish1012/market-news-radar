@@ -1,6 +1,6 @@
 # Market News Radar
 
-**美股新闻与策略研究工作台 · A workspace for U.S. market news and strategy research**
+**多市场行情与新闻研究工作台 · A workspace for multi-market history, U.S. sessions and attributed news**
 
 [中文介绍](#中文介绍) · [English overview](#english-overview)
 
@@ -31,12 +31,12 @@ Market News Radar 将财经新闻、自选股行情、K 线图、技术指标、
 
 回测使用已收盘 K 线生成信号，在下一根 K 线开盘价模拟成交，并计入用户设置的每边手续费和滑点。结果包括权益曲线、买入持有基准、收益、最大回撤、已平仓交易和胜率，交易记录可导出为 CSV。
 
-当前回测为单股、仅做多、全仓规则，允许碎股，不使用杠杆；期末持仓按收盘价估值。胜率只统计已平仓交易，结果不包含税费、融资成本和成交容量约束。
+当前成交回测限美股股票／ETF 常规时段，为单股、仅做多、全仓规则，允许碎股，不使用杠杆；期末持仓按收盘价估值。胜率只统计已平仓交易，结果不包含税费、融资成本和成交容量约束。
 
 ### 数据与 AI
 
-- **行情**：支持公共 Yahoo Finance 图表数据和需要账户凭证的 Alpaca IEX 历史 K 线；长桥集成提供实时报价订阅和股票新闻功能。
-- **新闻**：支持 RSS／Atom、Alpaca 新闻流及长桥股票新闻，具体可用性取决于已启用的数据源和账户权限。
+- **行情**：支持公共 Yahoo Finance 图表数据和需要账户凭证的 Alpaca IEX 历史 K 线；长桥提供美股四时段报价／预警及最近最多 1000 根历史 K 线；其他市场通过 Yahoo 提供韩股、日股、日经和 A 股历史及指标。
+- **新闻**：支持 RSS／Atom、Alpaca 新闻流、长桥股票新闻及指定 X 账号言论轮询（全部／筛选推送），保留原文、作者与引用关系，具体可用性取决于已启用的数据源和账户权限。
 - **AI 分析**：可配置 OpenAI、Google Gemini、Anthropic Claude 或 OpenAI 兼容服务。各供应商分别保存模型、接口地址和密钥，支持自定义模型 ID 与连接测试。AI 用于辅助分析新闻，策略回测依照代码中的明确规则执行。
 - **演示数据**：可主动选择合成行情验证图表和回测。真实数据请求失败时会显示错误，不会自动改用演示价格。
 
@@ -87,7 +87,7 @@ The current simulation uses one stock, long-only positions, full allocation, fra
 
 ### Data and AI
 
-- **Market data:** Public Yahoo Finance chart data and authenticated Alpaca IEX historical candles are supported. The Longbridge integration provides real-time quote subscriptions and stock news.
+- **Market data:** Public Yahoo Finance chart data and authenticated Alpaca IEX historical candles are supported. Longbridge supplies four-session U.S. quotes, alerts and optional recent history. Yahoo supports Korean, Japanese, Nikkei and Chinese historical instruments with local currency and timezone. Execution backtests are restricted to regular-session U.S. stocks/ETFs.
 - **News:** Sources include RSS/Atom, the Alpaca news stream, and Longbridge stock news. Availability depends on enabled sources and account permissions.
 - **AI analysis:** Configure OpenAI, Google Gemini, Anthropic Claude, or an OpenAI-compatible service. Each provider stores its own model, endpoint, and key, with custom model IDs and connection testing. AI assists news analysis; strategy backtests execute explicit rules defined in the code.
 - **Demo data:** Users can explicitly select synthetic prices to evaluate charts and backtests. Failed real-data requests show an error rather than silently switching to demo prices.
