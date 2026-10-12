@@ -8,6 +8,7 @@ from threading import RLock
 from datetime import datetime, timezone
 from .market_sessions import Quote
 from .instruments import resolve_instrument, SESSIONS
+from .smart_money_store import init_smart_money_schema
 
 
 def utcnow():
@@ -76,6 +77,7 @@ class DB:
                 self.conn.execute('''INSERT OR IGNORE INTO session_quotes
                     VALUES (?, 'unknown', ?, ?, ?, NULL, ?, 'unknown')''',
                     (row['symbol'], row['price'], currency, row['source'], received))
+            init_smart_money_schema(self.conn)
             self.conn.commit()
 
     def put_news(self, event: dict) -> int | None:

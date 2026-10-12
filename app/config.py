@@ -47,6 +47,11 @@ class Settings:
     x_bearer_token: str = field(default=os.getenv('X_BEARER_TOKEN', ''), repr=False)
     x_poll_interval: int = int(os.getenv('X_POLL_INTERVAL_SECONDS', '120'))
     x_accounts: list[dict] = field(default_factory=list)
+    smart_money_enabled: bool = False
+    smart_money_poll_interval: int = 900
+    smart_money_institutions: list[dict] = field(default_factory=list)
+    smart_money_cusip_map: dict[str,str] = field(default_factory=dict)
+    smart_money_issuer_map: dict[str,str] = field(default_factory=dict)
     test_mode: bool = _bool('TEST_MODE')
     watchlist_override: dict | None = field(default=None, repr=False)
     feeds_override: list | None = field(default=None, repr=False)

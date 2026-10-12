@@ -14,6 +14,7 @@ from urllib.parse import urlsplit
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator
 
 from .signals import norm_symbol
+from .smart_money_models import InstitutionConfig, normalize_cik, sec_symbol
 from .instruments import normalize_instruments, SESSIONS
 
 PROVIDERS = {
@@ -82,6 +83,43 @@ class XAccount(BaseModel):
 
 class Values(BaseModel):
     model_config = ConfigDict(extra='forbid')
+    smart_money_enabled: StrictBool | None = None
+    smart_money_poll_interval: int | None = Field(None,ge=300,le=86400,strict=True)
+    smart_money_institutions: list[InstitutionConfig] | None = Field(None,max_length=20)
+    smart_money_cusip_map: dict[str,str] | None = None
+    smart_money_issuer_map: dict[str,str] | None = None
+
+    @field_validator('smart_money_institutions')
+    @classmethod
+    def distinct_institutions(cls,values):
+        ids=[v.cik for v in (values or [])]
+        if len(ids)!=len(set(ids)):raise ValueError('机构 CIK 不能重复')
+        return values
+
+    @field_validator('smart_money_cusip_map')
+    @classmethod
+    def cusip_map_valid(cls,values):
+        if values is None:return None
+        if len(values)>200:raise ValueError('CUSIP 映射最多 200 条')
+        result={}
+        for cusip,symbol in values.items():
+            key=cusip.strip().upper()
+            if not re.fullmatch(r'[A-Z0-9*@#]{9}',key) or key in result:raise ValueError('CUSIP 无效或重复')
+            result[key]=sec_symbol(symbol)
+        return result
+
+    @field_validator('smart_money_issuer_map')
+    @classmethod
+    def issuer_map_valid(cls,values):
+        if values is None:return None
+        if len(values)>20:raise ValueError('发行人映射最多 20 条')
+        result={}
+        for symbol,cik in values.items():
+            key=sec_symbol(symbol)
+            if key in result:raise ValueError('发行人代码重复')
+            result[key]=normalize_cik(cik)
+        return result
+
     x_enabled: StrictBool | None = None
     x_poll_interval: int | None = Field(None,ge=60,le=3600)
     x_accounts: list[XAccount] | None = Field(None,max_length=20)
