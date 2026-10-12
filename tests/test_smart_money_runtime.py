@@ -132,6 +132,40 @@ def test_failed_previous_queue_survives_new_quarter(tmp_path):
     assert store.has_filing(previous['accession'])
 
 
+def test_unknown_period_budget_progresses_across_rounds(tmp_path):
+    engine=make_engine(tmp_path);config=configured(engine)
+    refs=[make_ref(accession=f'0001067983-26-{i+1:06d}',report_period=None) for i in range(21)]
+    client=Client(refs);store=SmartMoneyStore(engine.db)
+    for round_index in range(3):asyncio.run(collect_round(engine,config,client,now=NOW+round_index*3601))
+    assert len(store.filings(kind='institution'))==21
+    assert client.calls.count(refs[0]['accession'])==1
+    assert client.calls.count(refs[-1]['accession'])==1
+
+
+def test_permanent_failures_do_not_starve_later_pending(tmp_path):
+    engine=make_engine(tmp_path);config=configured(engine)
+    refs=[make_ref(accession=f'0001067983-26-{i+1:06d}') for i in range(21)]
+    client=Client(refs);client.bad={r['accession'] for r in refs[:20]};store=SmartMoneyStore(engine.db)
+    for round_index in range(2):asyncio.run(collect_round(engine,config,client,now=NOW+round_index*3601))
+    assert store.has_filing(refs[-1]['accession'])
+    assert len(store.progress('institution:1067983')['pending'])==20
+
+
+def test_ticker_failure_does_not_block_institutions_or_explicit_issuers(tmp_path):
+    engine=make_engine(tmp_path);config=configured(engine,smart_money_issuer_map={'NVDA':'1045810'})
+    class IndexFailure(Client):
+        async def ticker_index(self):raise SECError('network')
+    client=IndexFailure()
+    asyncio.run(collect_round(engine,config,client,now=NOW))
+    assert SmartMoneyStore(engine.db).has_filing(make_ref()['accession'])
+    assert 'submissions:1045810' in client.calls
+    health={r['source']:r for r in engine.db.list_rows('health')}
+    assert health['smart_money_tickers']['state']=='error'
+    from app.smart_money_views import smart_money_overview
+    overview=smart_money_overview(SmartMoneyStore(engine.db),config,engine.watchlist)
+    assert any(s['source_key']=='sec:tickers' and s['last_error'] for s in overview['sources'])
+
+
 def test_contact_missing_disabled_and_backoff(tmp_path,monkeypatch):
     engine=make_engine(tmp_path);client=Client()
     assert sec_contact_ready('Research <research@example.org>') and not sec_contact_ready('replace-contact')

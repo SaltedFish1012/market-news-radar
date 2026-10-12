@@ -36,6 +36,11 @@ def smart_money_overview(store,settings,watchlist:dict)->dict:
         if key=='sec:cooldown' and not p['last_error'] and not p['retry_at']:continue
         sources.append({k:p[k] for k in ('source_key','initialized','symbols','last_success_at','last_error','retry_at','failures','coverage_start','coverage_end','coverage_state')}|
             dict(name=names.get(cik,cik),enabled=bool(settings.smart_money_enabled and active.get(key,False)),state=state,pending_count=len(p['pending'])))
+    ticker_health=next((r for r in store.db.list_rows('health') if r['source']=='smart_money_tickers'),None)
+    if ticker_health and ticker_health['state']=='error':
+        p=empty_progress('sec:tickers');p.pop('pending')
+        sources.append(p|dict(name='SEC 官方股票代码表',enabled=settings.smart_money_enabled,state='error',pending_count=0,
+            coverage_state='partial',last_error=ticker_health['detail']))
     _,insider_count=store.transactions(limit=1)
     return dict(configured={'enabled':settings.smart_money_enabled,'contact_configured':sec_contact_ready(settings.sec_contact)},
         sources=sources,scope={'supported':[{'cik':cik,'symbols':symbols,'association':'发行人关联；不同股类不合并为同一证券'} for cik,symbols in scope.items()],'unsupported':unsupported},
@@ -45,6 +50,15 @@ def smart_money_overview(store,settings,watchlist:dict)->dict:
 def holdings_view(store,*,cik=None,period=None,symbol=None,limit=100,offset=0,cusip_map:dict)->dict:
     filings=store.filings(cik=cik,kind='institution')
     snapshots=build_snapshots(filings,{f['accession']:store.positions(f['accession']) for f in filings})
+    for snapshot in snapshots:
+        progress=store.progress('institution:'+snapshot['cik'])
+        pending=progress['pending']
+        affected=any(ref.get('form') in ('13F-HR','13F-HR/A') and
+            ref.get('report_period') in (None,snapshot['report_period']) for ref in pending)
+        discovery_failed=bool(progress['last_error'] and not pending)
+        if affected or discovery_failed or not progress['initialized']:
+            snapshot.update(complete=False,detail=(snapshot['detail']+'；' if snapshot['detail'] else '')+
+                ('存在尚未归档的申报，持仓差异待确认。' if affected else '来源发现尚未完成，持仓差异待确认。'))
     index={(s['cik'],s['report_period']):s for s in snapshots}
     reports=[];items=[]
     for snapshot in snapshots:

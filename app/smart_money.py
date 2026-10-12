@@ -53,6 +53,10 @@ async def discover(client,cik,kind,state,store,now):
     refs=filing_refs(payload,cik)
     forms=('13F-HR','13F-HR/A') if kind=='institution' else ('4','4/A')
     selected=[r for r in refs if r['form'] in forms]
+    resolved={f['accession']:f['report_period'] for f in store.filings(cik=cik,kind=kind)}
+    resolved.update({r['accession']:r['report_period'] for r in state['pending'] if r['report_period']})
+    for ref in selected:
+        if ref['report_period'] is None and ref['accession'] in resolved:ref['report_period']=resolved[ref['accession']]
     cutoff=(datetime.fromtimestamp(now,timezone.utc)-timedelta(days=90)).date().isoformat()
     def bounds():
         periods=[r['report_period'] for r in selected if r['report_period']]
@@ -70,11 +74,15 @@ async def discover(client,cik,kind,state,store,now):
         # supplemental files overlapping the lower boundary, including amendments.
         if start and page.get('filingTo','9999-12-31')<start:continue
         older=await client.submission_file(cik,page['name']);await checkpoint()
-        selected.extend(r for r in filing_refs(older,cik) if r['form'] in forms)
+        for ref in filing_refs(older,cik):
+            if ref['form'] not in forms:continue
+            if ref['report_period'] is None and ref['accession'] in resolved:ref['report_period']=resolved[ref['accession']]
+            selected.append(ref)
     cache={};failed=set();parse_error=None;remaining=20
     prior_pending={r['accession'] for r in state['pending']}
     if kind=='institution':
-        for ref in selected:
+        priority={r['accession']:i for i,r in enumerate(state['pending'])}
+        for ref in sorted(selected,key=lambda r:priority.get(r['accession'],len(priority))):
             if ref['report_period'] is not None or ref['accession'] in cache or ref['accession'] in failed:continue
             if remaining==0:break
             if not any(r['accession']==ref['accession'] for r in state['pending']):state['pending'].append(ref.copy())
@@ -113,13 +121,17 @@ async def collect_source(engine,config,client,store,kind,cik,symbols,now):
             if ref['accession'] not in known and not store.has_filing(ref['accession']):
                 state['pending'].append(ref);known.add(ref['accession'])
         state.update(initialized=True,coverage_start=start,coverage_end=end,coverage_state='partial')
+        # Move failures behind work not attempted this round. Their references
+        # stay durable; a fixed slice cannot block later files forever.
+        state['pending']=[r for r in state['pending'] if r['accession'] not in failed]+[r for r in state['pending'] if r['accession'] in failed]
         await checkpoint();store.save_progress(state)
     except (SECError,ValueError,KeyError) as error:
         if isinstance(error,SECError) and error.status_code in (403,429):
             await checkpoint();cooldown(store,error,now);raise
         discovery_error=error
     error=discovery_error
-    for ref in list(state['pending'])[:20]:
+    ordered=[r for r in state['pending'] if r['accession'] in cache]+[r for r in state['pending'] if r['accession'] not in cache]
+    for ref in ordered:
         if ref['accession'] in failed:continue
         if ref['accession'] not in cache and remaining==0:break
         try:
@@ -142,6 +154,8 @@ async def collect_source(engine,config,client,store,kind,cik,symbols,now):
                 state.update(last_error=exc.kind,coverage_state='partial')
                 await checkpoint();store.save_progress(state);cooldown(store,exc,now);raise
             error=exc
+            state['pending']=[r for r in state['pending'] if r['accession']!=ref['accession']]+[ref]
+            await checkpoint();store.save_progress(state)
     if kind=='institution':
         filings=store.filings(cik=cik,kind=kind)
         snapshots=build_snapshots(filings,{f['accession']:store.positions(f['accession']) for f in filings})
@@ -165,7 +179,18 @@ async def collect_round(engine,settings,client:SECClient,*,now:float)->None:
     try:
         records=[asdict(resolve_instrument(s,engine.watchlist.get('instruments'))) for s in engine.watchlist['symbols']]
         has_stocks=any(r['market']=='US' and r['asset_type']=='stock' for r in records)
-        index=await client.ticker_index() if has_stocks else {};await checkpoint()
+        index={};index_failed=False
+        if has_stocks:
+            try:
+                index=await client.ticker_index();await checkpoint()
+                engine.db.health('smart_money_tickers','ok','SEC 官方代码表读取成功。')
+            except (SECError,ValueError,KeyError) as exc:
+                await checkpoint()
+                if isinstance(exc,SECError) and exc.status_code in (403,429):raise
+                index_failed=True
+                engine.db.health('smart_money_tickers','error','SEC 官方代码表读取失败；机构和显式 CIK 继续采集。')
+        else:
+            await checkpoint();engine.db.health('smart_money_tickers','disabled','当前自选范围无需读取 SEC 股票代码表。')
         scope,_=resolve_issuer_scope(records,index,settings.smart_money_issuer_map)
         sources=[('institution',normalize_cik(i['cik']),[]) for i in settings.smart_money_institutions if i.get('enabled',True)]
         sources += [('issuer',cik,symbols) for cik,symbols in scope.items()]
@@ -173,7 +198,7 @@ async def collect_round(engine,settings,client:SECClient,*,now:float)->None:
             await collect_source(engine,settings,client,store,kind,cik,symbols,now);await checkpoint()
         state=store.progress('sec:cooldown');state.update(retry_at=0,failures=0,last_error='')
         await checkpoint();store.save_progress(state)
-        engine.db.health('smart_money','ok','SEC 采集轮次结束；覆盖状态见聪明钱页面。')
+        engine.db.health('smart_money','partial' if index_failed else 'ok','SEC 采集轮次结束；代码表暂不可用。' if index_failed else 'SEC 采集轮次结束；覆盖状态见聪明钱页面。')
     except (SECError,ValueError,KeyError) as error:
         await checkpoint()
         if isinstance(error,SECError) and error.status_code in (403,429):

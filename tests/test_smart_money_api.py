@@ -27,7 +27,8 @@ def test_filters_precede_pagination(web_client):
     assert body['items'][0]['amended'] is True and body['items'][0]['active_buy_sell'] is False
     holdings=client.get('/api/smart-money/holdings?symbol=NVDA&limit=1').json()
     assert holdings['total']==1 and holdings['items'][0]['symbol']=='NVDA'
-    assert holdings['reports'][0]['comparison_state']=='baseline_missing'
+    assert holdings['reports'][0]['comparison_state']=='not_comparable'
+    assert holdings['reports'][0]['previous_period'] is None
     assert 'items' not in holdings['reports'][0]
 
 
@@ -66,3 +67,22 @@ def test_api_never_fetches_upstream_or_exposes_contact(web_client,monkeypatch):
         assert 'private-research@example.org' not in response.text and token not in response.text
     response=client.get('/api/status')
     assert 'smart_money' in response.json() and 'private-research@example.org' not in response.text
+
+
+def test_pending_amendment_suppresses_exit_inference(web_client):
+    client,token=web_client;client.post('/api/session',json={'token':token})
+    import app.main as main
+    store=SmartMoneyStore(main.engine.db)
+    previous=make_filing(accession='0001067983-26-000010',report_period='2026-03-31',source_url='https://www.sec.gov/Archives/edgar/data/1067983/000106798326000010/primary_doc.xml')
+    current=make_filing(accession='0001067983-26-000011',source_url='https://www.sec.gov/Archives/edgar/data/1067983/000106798326000011/primary_doc.xml')
+    supplement=make_filing(accession='0001067983-26-000012',form='13F-HR/A',source_url='https://www.sec.gov/Archives/edgar/data/1067983/000106798326000012/primary_doc.xml')
+    store.commit_filing(previous,[make_position()],[],make_progress())
+    store.commit_filing(current,[],[],make_progress(pending=[supplement],coverage_state='partial',last_error='invalid_filing'))
+    for report_period in ['2026-06-30',None]:
+        state=store.progress('institution:1067983');state['pending'][0]['report_period']=report_period;store.save_progress(state)
+        body=client.get('/api/smart-money/holdings?period=2026-06-30').json()
+        assert body['reports'][0]['comparison_state']=='not_comparable'
+        assert all(row['change']=='unknown' and row['shares_delta'] is None for row in body['items'])
+        assert '尚未归档' in body['reports'][0]['detail']
+    state['pending']=[];state['last_error']='';state['coverage_state']='complete';store.save_progress(state)
+    assert client.get('/api/smart-money/holdings?period=2026-06-30').json()['items'][0]['change']=='exit'
