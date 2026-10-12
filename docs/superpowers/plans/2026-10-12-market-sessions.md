@@ -105,7 +105,7 @@ assert reference_close([{'session':'regular', 'complete':True, 'close':110, 'clo
 - Produces `longbridge_symbols(watchlist: dict) -> dict[str, str]`（供应商代码到内部代码）、`decode_longbridge_quotes(symbol: str, event: object, instrument: Instrument, received_at: float) -> list[Quote]`（同时接受快照与推送）。
 - `Engine.on_quote(quote: Quote) -> None`；`PriceRules.feed(symbol: str, price: float, now: float | None = None, *, session: str = 'unknown') -> list[dict]`；返回 key 包含 symbol/session/rule，预警含 currency/session/quote_at/source。旧仅价格回调测试改成显式 Quote，不能为了保留测试猜测 regular。
 
-- [ ] **Step 1: 添加失败测试。** `test_snapshot_and_push_preserve_all_sessions` 断言快照四个字段独立保存、SDK enum 转换准确、KR 不订阅 `.US`；`test_cancelled_generation_cannot_write` 断言回调已排队后取消不会写 DB 或 outbox；`test_session_windows_and_cooldowns` 断言如下：
+- [x] **Step 1: 添加失败测试。** `test_snapshot_and_push_preserve_all_sessions` 断言快照四个字段独立保存、SDK enum 转换准确、KR 不订阅 `.US`；`test_cancelled_generation_cannot_write` 断言回调已排队后取消不会写 DB 或 outbox；`test_session_windows_and_cooldowns` 断言如下：
 
 ```python
 assert rules.feed('NVDA', 101, 1000, session='regular') == []
@@ -116,10 +116,10 @@ assert rules.feed('NVDA', 101, 1400, session='regular') == []  # >370 秒重建�
 
 另测 sessions 筛选、约 5 分钟窗口、每规则冷却互不干扰、重复/倒序/过期/unknown/异常价不产生预警，热更新规则立即生效。用假 SDK 与临时 DB，不连接账户。
 
-- [ ] **Step 2: 运行失败验证。** `.\.venv\Scripts\python.exe -m pytest tests/test_longbridge_quotes.py tests/test_session_alerts.py -q`。
-- [ ] **Step 3: 实现快照与推送。** 同步夜盘环境变量；获取快照后订阅，推送使用 SDK `trade_session` 和 `timestamp`，不按墙钟判断会话。按 [SDK enum](https://longbridge.github.io/openapi/python/reference_all/#longbridge.openapi.TradeSession) 映射 Intraday/Pre/Post/Overnight 到 regular/pre/post/overnight，未知值保持 unknown。停止标记在 SDK callback 和事件循环实际写入前都检查，失败重连也失效旧标记。报价正常存储成功且鲜度合格才交规则；历史快照只展示、首笔无穿越预警。缓冲、前价、change_state、last_fired 按时段和规则隔离，长缺口重置窗口与前价但保留冷却。通知明确币种、时段、报价时间和来源；每条规则的 outbox key 使用该规则的冷却周期。
-- [ ] **Step 4: 重跑同一命令加 `tests/test_core.py tests/test_settings.py`。** 预期 PASS；保存夜盘和映射变化只重启相关长桥任务，日志不泄露凭证。
-- [ ] **Step 5: 提交任务文件。** `git commit -m "feat: support four-session Longbridge price alerts"`。
+- [x] **Step 2: 运行失败验证。** `.\.venv\Scripts\python.exe -m pytest tests/test_longbridge_quotes.py tests/test_session_alerts.py -q`。
+- [x] **Step 3: 实现快照与推送。** 同步夜盘环境变量；获取快照后订阅，推送使用 SDK `trade_session` 和 `timestamp`，不按墙钟判断会话。按 [SDK enum](https://longbridge.github.io/openapi/python/reference_all/#longbridge.openapi.TradeSession) 映射 Intraday/Pre/Post/Overnight 到 regular/pre/post/overnight，未知值保持 unknown。停止标记在 SDK callback 和事件循环实际写入前都检查，失败重连也失效旧标记。报价正常存储成功且鲜度合格才交规则；历史快照只展示、首笔无穿越预警。缓冲、前价、change_state、last_fired 按时段和规则隔离，长缺口重置窗口与前价但保留冷却。通知明确币种、时段、报价时间和来源；每条规则的 outbox key 使用该规则的冷却周期。
+- [x] **Step 4: 重跑同一命令加 `tests/test_core.py tests/test_settings.py`。** 预期 PASS；保存夜盘和映射变化只重启相关长桥任务，日志不泄露凭证。
+- [x] **Step 5: 提交任务文件。** `git commit -m "feat: support four-session Longbridge price alerts"`。
 
 ## Task 4: 历史 K 线的时段与收盘语义
 

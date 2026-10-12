@@ -54,6 +54,8 @@ class DB:
               PRIMARY KEY(symbol,session));
             ''')
             for row in self.conn.execute('SELECT * FROM quotes').fetchall():
+                if self.conn.execute('SELECT 1 FROM session_quotes WHERE symbol=?', (row['symbol'],)).fetchone():
+                    continue
                 try:
                     received = datetime.fromisoformat(row['observed_at']).timestamp()
                     currency = resolve_instrument(row['symbol']).currency

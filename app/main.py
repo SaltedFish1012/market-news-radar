@@ -57,7 +57,8 @@ async def stop_ai_tasks():
 
 def sync_longbridge_env(config):
     mapping = {'LONGBRIDGE_APP_KEY': config.lb_app_key, 'LONGBRIDGE_APP_SECRET': config.lb_app_secret,
-               'LONGBRIDGE_ACCESS_TOKEN': config.lb_access_token, 'LONGBRIDGE_CLIENT_ID': config.lb_client_id}
+               'LONGBRIDGE_ACCESS_TOKEN': config.lb_access_token, 'LONGBRIDGE_CLIENT_ID': config.lb_client_id,
+               'LONGBRIDGE_ENABLE_OVERNIGHT': str(config.lb_overnight_enabled).lower()}
     for name, value in mapping.items():
         os.environ[name] = value
 
@@ -68,13 +69,14 @@ async def apply_runtime(config):
     groups = {
         'rss': ('rss_interval', 'sec_contact', 'feeds_override'),
         'alpaca_news': ('alpaca_key', 'alpaca_secret', 'alpaca_url', 'alpaca_news_enabled'),
-        'longbridge_quote': ('lb_enabled', 'lb_app_key', 'lb_app_secret', 'lb_access_token', 'lb_client_id'),
+        'longbridge_quote': ('lb_enabled', 'lb_app_key', 'lb_app_secret', 'lb_access_token', 'lb_client_id','lb_overnight_enabled'),
         'longbridge_news': ('lb_news_enabled', 'lb_app_key', 'lb_app_secret', 'lb_access_token', 'lb_client_id', 'lb_news_interval'),
         'notification': ('notifications_enabled', 'telegram_token', 'telegram_chat', 'bark_key', 'bark_base'),
     }
     restart = {name for name, fields in groups.items() if any(getattr(old, f) != getattr(config, f) for f in fields)}
     new_watchlist = config.read_json('watchlist.json')
-    if new_watchlist['symbols'] != engine.watchlist['symbols']:
+    if (new_watchlist['symbols'] != engine.watchlist['symbols'] or
+            new_watchlist.get('instruments') != engine.watchlist.get('instruments')):
         restart.update(('longbridge_quote', 'longbridge_news'))
     await stop_jobs(restart)
     ai_changed = any(getattr(old,f) != getattr(config,f) for f in ('ai_enabled','ai_key','ai_provider','ai_model','ai_base_url'))

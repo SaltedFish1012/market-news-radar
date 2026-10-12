@@ -28,9 +28,9 @@ def test_atom():
 
 def test_price_crossing():
     rule=PriceRules(CFG)
-    assert rule.feed('WDC',101,now=1000)==[]
-    assert len(rule.feed('WDC',99,now=1001))==1
-    assert rule.feed('WDC',98,now=1002)==[]
+    assert rule.feed('WDC',101,now=1000,session='regular')==[]
+    assert len(rule.feed('WDC',99,now=1001,session='regular'))==1
+    assert rule.feed('WDC',98,now=1002,session='regular')==[]
 
 def test_db_dedupe_and_outbox(tmp_path):
     db=DB(str(tmp_path/'test.db'))
@@ -71,8 +71,9 @@ def test_quote_to_alert_pipeline(tmp_path):
        news_max_age_minutes=25,ai_key='')
     engine=Engine(settings)
     async def run():
-        await engine.on_quote('WDC.US',101)
-        await engine.on_quote('WDC.US',99)
+        from app.market_sessions import Quote
+        await engine.on_quote(Quote('WDC',101,'USD','LB','regular',1000,1001,'normal'))
+        await engine.on_quote(Quote('WDC',99,'USD','LB','regular',1001,1002,'normal'))
     asyncio.run(run())
     assert len(engine.db.due_alerts())==1
     assert engine.db.list_rows('quotes')[0]['symbol']=='WDC'

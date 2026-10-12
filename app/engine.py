@@ -10,6 +10,8 @@ from .db import DB, utcnow
 from .ai_client import request_analysis
 from .feeds import parse_dt, strip_html
 from .signals import classify, event_hash, norm_symbol, PriceRules
+from .instruments import resolve_instrument
+from .market_sessions import Quote, quote_is_eligible, SESSION_NAMES
 
 log=logging.getLogger(__name__)
 
@@ -119,14 +121,21 @@ class Engine:
     async def _request_ai(self, event: dict) -> dict:
         return await request_analysis(self.settings, event)
 
-    async def on_quote(self, symbol: str, price: float):
-        s=norm_symbol(symbol)
-        if not s or not (0 < price < 1e8):return
-        self.db.quote(s,price,'Longbridge OpenAPI')
-        for alert in self.rules.feed(s,price):
-            tick=int(time.time()/max(1,next((r.get('cooldown_s',300) for r in self.rules.rules if norm_symbol(r.get('symbol',''))==s),300)))
-            self.db.add_alert(f'quote:{alert["key"]}:{tick}',f'{s} 价格异动',
-                alert['detail']+'\n数据来源：Longbridge OpenAPI。未验证市场原因，请结合实时资讯确认。', 'high')
+    async def on_quote(self, quote: Quote):
+        try:
+            instrument = resolve_instrument(quote.symbol, self.watchlist.get('instruments'))
+        except ValueError:
+            return
+        if quote.currency != instrument.currency:
+            self.db.health('longbridge_quote','error','报价币种与配置不一致')
+            return
+        if not self.db.put_session_quote(quote) or not quote_is_eligible(quote):
+            return
+        for alert in self.rules.feed(instrument.symbol,quote.price,quote.quote_at,session=quote.session):
+            tick=int(quote.quote_at/max(1,alert['cooldown_s']))
+            stamp=datetime.fromtimestamp(quote.quote_at,timezone.utc).isoformat()
+            self.db.add_alert(f'quote:{alert["key"]}:{tick}',f'{instrument.symbol} 价格异动',
+                alert['detail']+f'\n币种：{quote.currency}\n时段：{SESSION_NAMES[quote.session]}\n报价时间：{stamp}\n数据来源：{quote.source}。未验证市场原因。', 'high')
 
 
 async def notification_loop(engine, settings):

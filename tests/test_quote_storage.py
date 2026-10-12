@@ -35,3 +35,13 @@ def test_session_migration_preserves_existing_news_and_alerts(tmp_path):
         assert db.list_rows('alerts')[0]['body'] == 'body'
         assert db.session_quotes() == []
         db.conn.close()
+
+
+def test_current_session_quotes_are_not_remigrated_as_legacy(tmp_path):
+    m = model()
+    path = str(tmp_path/'db')
+    db = DB(path)
+    db.put_session_quote(m.Quote('NVDA',100,'USD','LB','regular',1000,1001,'normal'))
+    db.conn.close()
+    db = DB(path)
+    assert [row['session'] for row in db.session_quotes()] == ['regular']
