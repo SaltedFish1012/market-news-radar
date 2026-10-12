@@ -198,7 +198,7 @@ assert jp_backtest_response.status_code == 422 and overnight_backtest_response.s
 - Produces `renderSessionQuotes(quotes: dict, instrument: dict) -> void`、`formatMoney(value: number, currency: string) -> string`、`barDate(value: number, short: boolean = false, timezone: string = 'America/New_York') -> string`；所有行情/交易调用显式传入结果的 instrument.timezone。CSV 添加 currency、market、timezone、session 列，损益列为 `net_pnl`，UTC 时间列保留。
 - 提取现有 DOM workspace helper 到 `tests/frontend_helpers.cjs`，导出 `{workspace, tick}`；使用 `RADAR_TEST_PYTHON` 优先、否则 Windows/Unix venv 探测；原测试与新测试共用，不引入应用构建依赖。
 
-- [ ] **Step 1: 添加失败 DOM 测试。** `four session cards show source time freshness and missing prices` 断言四卡及“暂无报价”；`session switch sends session parameter and ignores late response` 断言晚到 regular 响应不覆盖 overnight；`instrument editor saves metadata and rule sessions` 断言保存 payload；`currency timezone and CSV follow result instrument` 断言选中标的切换后金额、日期和导出一致。覆盖 stale 卡到期更新、regular 后备说明、夜盘开关、设置未加载时不可保存、手机宽度布局控件可见。
+- [x] **Step 1: 添加失败 DOM 测试。** `four session cards show source time freshness and missing prices` 断言四卡及“暂无报价”；`session switch sends session parameter and ignores late response` 断言晚到 regular 响应不覆盖 overnight；`instrument editor saves metadata and rule sessions` 断言保存 payload；`currency timezone and CSV follow result instrument` 断言选中标的切换后金额、日期和导出一致。覆盖 stale 卡到期更新、regular 后备说明、夜盘开关、设置未加载时不可保存、手机宽度布局控件可见。
 
 ```javascript
 // four session cards show source time freshness and missing prices
@@ -208,10 +208,10 @@ assert.equal(new URL(lastMarketRequest, 'http://radar.test').searchParams.get('s
 // instrument editor saves metadata and rule sessions
 assert.deepEqual(saved.watchlist.price_rules[0].sessions, ['overnight']);
 ```
-- [ ] **Step 2: 运行失败验证。** `node --test tests/frontend_settings.test.cjs tests/frontend_market.test.cjs`；新增 UI 断言失败。
-- [ ] **Step 3: 实现页面和 helper。** 增加长桥历史源、会话选择和四时段卡；名称、币种、来源、市场时区显式显示，界面更新时间不冒充上游时间。刷新 quotes 不等待慢 K 线；按标的/provider/session 请求代次丢弃旧响应。设置页提供标的元数据编辑、规则时段勾选和夜盘开关；图表、净值、交易表、CSV 移除固定 USD/美东标签。所有配置字段继续 escape，sources 显示无实时数据的市场状态。修改资源版本使已打开页面可刷新新脚本。
-- [ ] **Step 4: 重跑同一 DOM 命令并做本地浏览器检查。** 预期 PASS；检查市场、策略和设置页在桌面/窄屏的四卡、选择控件和错误状态，无控制台异常。
-- [ ] **Step 5: 提交任务文件。** `git commit -m "feat: display four sessions and instrument-aware formatting"`。
+- [x] **Step 2: 运行失败验证。** `node --test tests/frontend_settings.test.cjs tests/frontend_market.test.cjs`；新增 UI 断言失败。
+- [x] **Step 3: 实现页面和 helper。** 增加长桥历史源、会话选择和四时段卡；名称、币种、来源、市场时区显式显示，界面更新时间不冒充上游时间。刷新 quotes 不等待慢 K 线；按标的/provider/session 请求代次丢弃旧响应。设置页提供标的元数据编辑、规则时段勾选和夜盘开关；图表、净值、交易表、CSV 移除固定 USD/美东标签。所有配置字段继续 escape，sources 显示无实时数据的市场状态。修改资源版本使已打开页面可刷新新脚本。
+- [x] **Step 4: 重跑同一 DOM 命令并做本地浏览器检查。** 预期 PASS；检查市场、策略和设置页在桌面/窄屏的四卡、选择控件和错误状态，无控制台异常。
+- [x] **Step 5: 提交任务文件。** `git commit -m "feat: display four sessions and instrument-aware formatting"`。
 
 ## Task 8: 其他市场历史行情与新闻关联
 
