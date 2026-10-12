@@ -23,6 +23,7 @@ from .feeds import rss_loop
 from .connectors import alpaca_news_loop,longbridge_quote_loop,longbridge_news_loop
 from .x_news import x_news_loop, XClient, XAPIError
 from .x_views import XPreviewRequest, preview_posts
+from .smart_money import smart_money_loop
 
 logging.basicConfig(level='INFO',format='%(asctime)s %(levelname)s %(name)s: %(message)s')
 # HTTP request logs can contain Telegram/Bark credentials in paths.
@@ -34,6 +35,7 @@ config_store: SettingsStore | None = None
 settings_lock = asyncio.Lock()
 jobs = {}
 JOB_FUNCTIONS = {'rss': rss_loop, 'alpaca_news': alpaca_news_loop,
+                 'smart_money':smart_money_loop,
                  'x_news':x_news_loop,
                  'longbridge_quote': longbridge_quote_loop, 'longbridge_news': longbridge_news_loop,
                  'notification': notification_loop}
@@ -72,6 +74,8 @@ async def apply_runtime(config):
     global settings
     old = settings
     groups = {
+        'smart_money':('smart_money_enabled','smart_money_poll_interval','smart_money_institutions',
+                      'smart_money_cusip_map','smart_money_issuer_map','sec_contact'),
         'x_news':('x_enabled','x_bearer_token','x_poll_interval','x_accounts'),
         'rss': ('rss_interval', 'sec_contact', 'feeds_override'),
         'alpaca_news': ('alpaca_key', 'alpaca_secret', 'alpaca_url', 'alpaca_news_enabled'),
@@ -83,7 +87,7 @@ async def apply_runtime(config):
     new_watchlist = config.read_json('watchlist.json')
     if (new_watchlist['symbols'] != engine.watchlist['symbols'] or
             new_watchlist.get('instruments') != engine.watchlist.get('instruments')):
-        restart.update(('longbridge_quote', 'longbridge_news'))
+        restart.update(('longbridge_quote', 'longbridge_news','smart_money'))
     await stop_jobs(restart)
     ai_changed = any(getattr(old,f) != getattr(config,f) for f in ('ai_enabled','ai_key','ai_provider','ai_model','ai_base_url'))
     if ai_changed:
