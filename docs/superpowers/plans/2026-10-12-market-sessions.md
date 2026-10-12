@@ -130,7 +130,7 @@ assert rules.feed('NVDA', 101, 1400, session='regular') == []  # >370 秒重建�
 - Produces `bar_is_complete(timestamp: float, interval: str, instrument: Instrument, periods: dict | None, now: float) -> bool`、`classify_bar_session(timestamp: float, periods: dict | None) -> str`；`normalize_bars(rows: list[dict], interval: str, *, instrument: Instrument | None = None, periods: dict | None = None, now: float | None = None) -> list[dict]` 保留会话与可信 closed_at。
 - `MarketData.candles(symbol: str, interval: str = '1d', provider: str = 'yahoo', session: str = 'regular') -> dict`；结果增加 `instrument`、`session`、`coverage`（supported_sessions/actual_sessions/notice）、`timezone`，保留原键。缓存键 `(symbol, provider, interval, session)`，配置/凭证变化失效。
 
-- [ ] **Step 1: 添加失败测试 `test_yahoo_session_request_and_cache`、`test_dst_midnight_and_early_close`、`test_missing_periods_are_conservative`。** 模拟 Yahoo tradingPeriods/currentTradingPeriod：pre 查询开启 includePrePost；regular 与 all 缓存不互通；美国夏令时切换的两组 UTC 时间仍正确归类；提前收市 13:00 后日线完成；当前日/周元数据缺失为 incomplete；同一午夜附近时间在东京、纽约分别判定。断言 unknown 分钟 bar 不冒充 pre，非分钟 pre/post/overnight 明确抛 MarketError，Yahoo overnight 明确不支持。
+- [x] **Step 1: 添加失败测试 `test_yahoo_session_request_and_cache`、`test_dst_midnight_and_early_close`、`test_missing_periods_are_conservative`。** 模拟 Yahoo tradingPeriods/currentTradingPeriod：pre 查询开启 includePrePost；regular 与 all 缓存不互通；美国夏令时切换的两组 UTC 时间仍正确归类；提前收市 13:00 后日线完成；当前日/周元数据缺失为 incomplete；同一午夜附近时间在东京、纽约分别判定。断言 unknown 分钟 bar 不冒充 pre，非分钟 pre/post/overnight 明确抛 MarketError，Yahoo overnight 明确不支持。
 
 ```python
 # test_yahoo_session_request_and_cache
@@ -139,10 +139,10 @@ assert regular_result['session'] == 'regular' and all_result['session'] == 'all'
 # test_missing_periods_are_conservative（固定 now 与 timestamp 在相同市场日期）
 assert current_daily['complete'] is False and current_weekly['complete'] is False
 ```
-- [ ] **Step 2: 运行失败验证。** `.\.venv\Scripts\python.exe -m pytest tests/test_session_candles.py tests/test_research.py -q`。
-- [ ] **Step 3: 实现上述接口并升级 Yahoo/Alpaca。** 供应商路径使用 `urllib.parse.quote(..., safe='')`；Yahoo 使用供应商交易区间标记会话，不写死交易日。仅返回真实 bars；当前日/周缺少实际结束依据保持保守，已过去历史周期按市场日期判定但不伪造 closed_at。Alpaca 仅承诺 regular 并说明 IEX 范围，其他请求提示长桥。币种不符返回显式数据错误。演示数据保持明确合成标签，并采用选定标的元数据。
-- [ ] **Step 4: 重跑同一命令。** 预期 PASS；指标、下一根开盘成交与无未来数据的旧测试仍通过。
-- [ ] **Step 5: 提交任务文件。** `git commit -m "feat: normalize historical sessions and market close times"`。
+- [x] **Step 2: 运行失败验证。** `.\.venv\Scripts\python.exe -m pytest tests/test_session_candles.py tests/test_research.py -q`。
+- [x] **Step 3: 实现上述接口并升级 Yahoo/Alpaca。** 供应商路径使用 `urllib.parse.quote(..., safe='')`；Yahoo 使用供应商交易区间标记会话，不写死交易日。仅返回真实 bars；当前日/周缺少实际结束依据保持保守，已过去历史周期按市场日期判定但不伪造 closed_at。Alpaca 仅承诺 regular 并说明 IEX 范围，其他请求提示长桥。币种不符返回显式数据错误。演示数据保持明确合成标签，并采用选定标的元数据。
+- [x] **Step 4: 重跑同一命令。** 预期 PASS；指标、下一根开盘成交与无未来数据的旧测试仍通过。
+- [x] **Step 5: 提交任务文件。** `git commit -m "feat: normalize historical sessions and market close times"`。
 
 ## Task 5: 长桥历史行情适配
 
