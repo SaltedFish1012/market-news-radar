@@ -57,13 +57,16 @@ async def alpaca_news_loop(engine, settings):
             backoff=min(backoff*2,90)
 
 
-def lb_config():
+def lb_config(settings=None):
     from longbridge.openapi import Config, OAuthBuilder
-    client_id=os.getenv('LONGBRIDGE_CLIENT_ID','').strip()
+    client_id=settings.lb_client_id if settings is not None else os.getenv('LONGBRIDGE_CLIENT_ID','').strip()
     if client_id:
         # Register and authorize locally first; token cached in mounted home directory.
         oauth=OAuthBuilder(client_id).build(lambda url: log.warning('Authorize Longbridge locally: %s',url))
-        return Config.from_oauth(oauth)
+        return Config.from_oauth(oauth, enable_overnight=settings.lb_overnight_enabled) if settings is not None else Config.from_oauth(oauth)
+    if settings is not None:
+        return Config.from_apikey(settings.lb_app_key, settings.lb_app_secret, settings.lb_access_token,
+                                  enable_overnight=settings.lb_overnight_enabled, enable_print_quote_packages=False)
     return Config.from_apikey_env()
 
 
@@ -135,7 +138,7 @@ async def longbridge_quote_loop(engine, settings):
         stopped = Event()
         try:
             def run(stopped=stopped):
-                ctx=QuoteContext(lb_config())
+                ctx=QuoteContext(lb_config(settings))
                 if stopped.is_set():
                     return None
                 def callback(symbol, event):
@@ -187,7 +190,7 @@ async def longbridge_news_loop(engine, settings):
     ctx=None
     while True:
         try:
-            if ctx is None:ctx=await asyncio.to_thread(lambda:ContentContext(lb_config()))
+            if ctx is None:ctx=await asyncio.to_thread(lambda:ContentContext(lb_config(settings)))
             for s in symbols:
                 items=await asyncio.to_thread(ctx.news,s)
                 for news in (items or [])[:20]:

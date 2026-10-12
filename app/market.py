@@ -83,7 +83,8 @@ class MarketData:
             raise MarketError('Alpaca IEX 本轮仅支持美股常规时段，请选择长桥或公共历史源')
         if provider == 'demo' and session != 'regular':
             raise MarketError('合成演示仅提供常规时段')
-        key = (symbol, provider, interval, session)
+        request_settings = self.settings
+        key = (symbol, provider, interval, session, id(request_settings), repr(instrument))
         cached = self.cache.get(key)
         ttl = 60 if interval in ('5m', '1h') else 300
         if cached and time.monotonic() - cached[0] < ttl:
@@ -96,6 +97,9 @@ class MarketData:
                     result = self._demo(symbol, interval)
                 elif provider == 'alpaca':
                     result = await self._alpaca(symbol, interval)
+                elif provider == 'longbridge':
+                    from .longbridge_market import longbridge_candles
+                    result = await longbridge_candles(request_settings, instrument, interval, session)
                 else:
                     result = await self._yahoo(symbol, interval, session)
             except MarketError:
@@ -108,12 +112,15 @@ class MarketData:
             raise MarketError('该股票在所选周期没有可用 K 线')
         if provider == 'demo':
             result['currency'] = instrument.currency
-        supported = ['regular','pre','post','all'] if provider == 'yahoo' and interval in ('5m','1h') and instrument.market == 'US' else ['regular']
+        supported = ['regular','pre','post','all'] if provider == 'yahoo' and interval in ('5m','1h') and instrument.market == 'US' else (list(SESSIONS) + ['all'] if provider == 'longbridge' and interval in ('5m','1h') else ['regular'])
+        if provider == 'longbridge' and not request_settings.lb_overnight_enabled:
+            supported = [s for s in supported if s != 'overnight']
         result.update(symbol=symbol, interval=interval, instrument=asdict(instrument), timezone=instrument.timezone,
                       session=session, coverage={'supported_sessions':supported,
                       'actual_sessions':sorted({b['session'] for b in result['bars']}),'notice':result['notice']},
                       fetched_at=datetime.now(timezone.utc).isoformat(), cached=False)
-        self.cache[key] = (time.monotonic(), copy.deepcopy(result))
+        if self.settings is request_settings:
+            self.cache[key] = (time.monotonic(), copy.deepcopy(result))
         if len(self.cache) > 256:
             self.cache.pop(next(iter(self.cache)))
         return result

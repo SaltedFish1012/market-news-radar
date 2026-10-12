@@ -1,2 +1,2 @@
 -r requirements.txt
-longbridge>=4,<6
+longbridge>=5.2,<6

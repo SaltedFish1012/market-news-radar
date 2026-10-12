@@ -152,7 +152,7 @@ assert current_daily['complete'] is False and current_weekly['complete'] is Fals
 - Consumes `Instrument`、`Quote`、标准 Candle 与现有 `lb_config()`。
 - Produces `longbridge_candles(settings: object, instrument: Instrument, interval: str, session: str) -> dict`（async）；`decode_candlesticks(rows: list[object], instrument: Instrument, interval: str, now: float) -> list[dict]`。
 
-- [ ] **Step 1: 添加失败测试 `test_longbridge_history_sessions_and_limits`。** 假 SDK 断言分钟请求第 5 个位置参数为 `TradeSessions.All`、count 不超过 1000，5m/1h/1d/1wk 分别映射 Period.Min_5/Min_60/Day/Week；bar 的 session 原样转换；overnight 开关关闭时明确错误；SDK 缺失、映射缺失或权限失败返回可理解且不含密钥的 MarketError，不能退回 demo。日/周查询使用常规供应商 OHLC。
+- [x] **Step 1: 添加失败测试 `test_longbridge_history_sessions_and_limits`。** 假 SDK 断言分钟请求第 5 个位置参数为 `TradeSessions.All`、count 不超过 1000，5m/1h/1d/1wk 分别映射 Period.Min_5/Min_60/Day/Week；bar 的 session 原样转换；overnight 开关关闭时明确错误；SDK 缺失、映射缺失或权限失败返回可理解且不含密钥的 MarketError，不能退回 demo。日/周查询使用常规供应商 OHLC。
 
 ```python
 # test_longbridge_history_sessions_and_limits
@@ -160,10 +160,10 @@ assert captured_args[0] == 'NVDA.US' and captured_args[1] == Period.Min_5
 assert captured_args[2] <= 1000 and captured_args[4] == TradeSessions.All
 assert {bar['session'] for bar in result['bars']} == {'overnight'}
 ```
-- [ ] **Step 2: 运行失败验证。** `.\.venv\Scripts\python.exe -m pytest tests/test_longbridge_market.py -q`。
-- [ ] **Step 3: 实现历史适配。** SDK 延迟导入，同步调用放 `asyncio.to_thread`；依据已核对的 [官方 candlesticks 接口](https://open.longbridge.com/docs/quote/pull/candlestick) 获取最近最多 1000 根，声明查询范围限制。SDK 调用用第 5 个位置参数，避免官方示例 trade_session 与 [SDK 签名 trade_sessions](https://longbridge.github.io/openapi/python/reference_all/#longbridge.openapi.QuoteContext.candlesticks) 的差异；分钟采用 All、日/周采用 Intraday。仅按返回标签过滤延长时段；未知 bar 不归入指定会话。历史源独立标明，夜盘开关/认证改变清缓存；请求期间配置改变不能缓存为新配置数据。
-- [ ] **Step 4: 重跑该测试加 `tests/test_session_candles.py`。** 预期 PASS，无实际 SDK 网络访问。
-- [ ] **Step 5: 提交任务文件。** `git commit -m "feat: add Longbridge session candle adapter"`。
+- [x] **Step 2: 运行失败验证。** `.\.venv\Scripts\python.exe -m pytest tests/test_longbridge_market.py -q`。
+- [x] **Step 3: 实现历史适配。** SDK 延迟导入，同步调用放 `asyncio.to_thread`；依据已核对的 [官方 candlesticks 接口](https://open.longbridge.com/docs/quote/pull/candlestick) 获取最近最多 1000 根，声明查询范围限制。SDK 调用用第 5 个位置参数，避免官方示例 trade_session 与 [SDK 签名 trade_sessions](https://longbridge.github.io/openapi/python/reference_all/#longbridge.openapi.QuoteContext.candlesticks) 的差异；分钟采用 All、日/周采用 Intraday。仅按返回标签过滤延长时段；未知 bar 不归入指定会话。历史源独立标明，夜盘开关/认证改变清缓存；请求期间配置改变不能缓存为新配置数据。
+- [x] **Step 4: 重跑该测试加 `tests/test_session_candles.py`。** 预期 PASS，无实际 SDK 网络访问。
+- [x] **Step 5: 提交任务文件。** `git commit -m "feat: add Longbridge session candle adapter"`。
 
 ## Task 6: API、实时总览和回测边界
 
