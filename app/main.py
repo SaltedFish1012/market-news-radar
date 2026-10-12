@@ -16,9 +16,18 @@ from .ai_client import request_analysis, AIError
 from .market import MarketData, MarketError, INTERVALS
 from .strategies import CATALOG, indicators, strategy_snapshot, backtest
 from .signals import norm_symbol, PriceRules
+from .instruments import resolve_instrument
+from .market_sessions import Quote, quote_view
 from .engine import Engine, notification_loop
 from .feeds import rss_loop
 from .connectors import alpaca_news_loop,longbridge_quote_loop,longbridge_news_loop
+from .x_news import x_news_loop, XClient, XAPIError
+from .x_views import XPreviewRequest, preview_posts
+from .smart_money import smart_money_loop
+from .smart_money_store import SmartMoneyStore
+from .smart_money_views import smart_money_overview, holdings_view, insiders_view, issuer_associations
+from .smart_money_models import normalize_cik, sec_symbol
+from .sec_13f import quarter_date
 
 logging.basicConfig(level='INFO',format='%(asctime)s %(levelname)s %(name)s: %(message)s')
 # HTTP request logs can contain Telegram/Bark credentials in paths.
@@ -30,6 +39,8 @@ config_store: SettingsStore | None = None
 settings_lock = asyncio.Lock()
 jobs = {}
 JOB_FUNCTIONS = {'rss': rss_loop, 'alpaca_news': alpaca_news_loop,
+                 'smart_money':smart_money_loop,
+                 'x_news':x_news_loop,
                  'longbridge_quote': longbridge_quote_loop, 'longbridge_news': longbridge_news_loop,
                  'notification': notification_loop}
 
@@ -57,7 +68,8 @@ async def stop_ai_tasks():
 
 def sync_longbridge_env(config):
     mapping = {'LONGBRIDGE_APP_KEY': config.lb_app_key, 'LONGBRIDGE_APP_SECRET': config.lb_app_secret,
-               'LONGBRIDGE_ACCESS_TOKEN': config.lb_access_token, 'LONGBRIDGE_CLIENT_ID': config.lb_client_id}
+               'LONGBRIDGE_ACCESS_TOKEN': config.lb_access_token, 'LONGBRIDGE_CLIENT_ID': config.lb_client_id,
+               'LONGBRIDGE_ENABLE_OVERNIGHT': str(config.lb_overnight_enabled).lower()}
     for name, value in mapping.items():
         os.environ[name] = value
 
@@ -66,16 +78,20 @@ async def apply_runtime(config):
     global settings
     old = settings
     groups = {
+        'smart_money':('smart_money_enabled','smart_money_poll_interval','smart_money_institutions',
+                      'smart_money_cusip_map','smart_money_issuer_map','sec_contact'),
+        'x_news':('x_enabled','x_bearer_token','x_poll_interval','x_accounts'),
         'rss': ('rss_interval', 'sec_contact', 'feeds_override'),
         'alpaca_news': ('alpaca_key', 'alpaca_secret', 'alpaca_url', 'alpaca_news_enabled'),
-        'longbridge_quote': ('lb_enabled', 'lb_app_key', 'lb_app_secret', 'lb_access_token', 'lb_client_id'),
+        'longbridge_quote': ('lb_enabled', 'lb_app_key', 'lb_app_secret', 'lb_access_token', 'lb_client_id','lb_overnight_enabled'),
         'longbridge_news': ('lb_news_enabled', 'lb_app_key', 'lb_app_secret', 'lb_access_token', 'lb_client_id', 'lb_news_interval'),
         'notification': ('notifications_enabled', 'telegram_token', 'telegram_chat', 'bark_key', 'bark_base'),
     }
     restart = {name for name, fields in groups.items() if any(getattr(old, f) != getattr(config, f) for f in fields)}
     new_watchlist = config.read_json('watchlist.json')
-    if new_watchlist['symbols'] != engine.watchlist['symbols']:
-        restart.update(('longbridge_quote', 'longbridge_news'))
+    if (new_watchlist['symbols'] != engine.watchlist['symbols'] or
+            new_watchlist.get('instruments') != engine.watchlist.get('instruments')):
+        restart.update(('longbridge_quote', 'longbridge_news','smart_money'))
     await stop_jobs(restart)
     ai_changed = any(getattr(old,f) != getattr(config,f) for f in ('ai_enabled','ai_key','ai_provider','ai_model','ai_base_url'))
     if ai_changed:
@@ -86,7 +102,7 @@ async def apply_runtime(config):
         engine.rules = PriceRules(new_watchlist)
     engine.watchlist = new_watchlist
     market.settings = config
-    if (old.alpaca_key,old.alpaca_secret) != (config.alpaca_key,config.alpaca_secret):
+    if old != config or new_watchlist != engine.watchlist:
         market.cache.clear()
     sync_longbridge_env(config)
     if ai_changed:
@@ -110,6 +126,8 @@ async def lifespan(app:FastAPI):
     market.settings = settings
     sync_longbridge_env(settings)
     engine = Engine(settings)
+    market.db = engine.db
+    market.cache.clear()
     engine.db.health('service', 'ok', 'running')
     engine.db.health('ai', 'ready' if settings.ai_enabled else 'disabled',
                      f'{settings.ai_provider} / {settings.ai_model}; configured, not yet verified' if settings.ai_enabled else 'AI analysis paused')
@@ -122,7 +140,7 @@ async def lifespan(app:FastAPI):
         engine.db.health('service','stopped','shutdown')
         engine.db.conn.close()
 
-app=FastAPI(title='Market News Radar',description='News-first US equity alert prototype; never trades',version='0.3.0',lifespan=lifespan)
+app=FastAPI(title='Market News Radar',description='Multi-market research and attributed news; never trades',version='0.4.0',lifespan=lifespan)
 
 
 @app.exception_handler(RequestValidationError)
@@ -195,22 +213,80 @@ async def health():
 
 @app.get('/api/status')
 async def status(_auth=Depends(auth)):
-    return {'source_health':[{**r, 'detail': config_store.redact(r['detail'])} for r in engine.db.list_rows('health')],'configured':{
+    smart=smart_money_overview(SmartMoneyStore(engine.db),settings,engine.watchlist)
+    accounts = []
+    for account in settings.x_accounts:
+        user = engine.db.x_user(account['username'])
+        cursor = engine.db.x_cursor(user['id'] if user else 'username:'+account['username'].casefold())
+        accounts.append({'configured_username':account['username'],'enabled':settings.x_enabled and account['enabled'],
+                         'user':user,**{k:cursor.get(k) for k in ('initialized','last_success_at','last_post_at','retry_at')},
+                         'error':config_store.redact(cursor.get('error',''))})
+    return {'smart_money':{'configured':smart['configured'],'sources':[{**s,'last_error':config_store.redact(s['last_error'])} for s in smart['sources']]},'x_accounts':accounts,'source_health':[{**r, 'detail': config_store.redact(r['detail'])} for r in engine.db.list_rows('health')],'configured':{
+        'x_news':bool(settings.x_enabled and settings.x_bearer_token),
         'alpaca_news':bool(settings.alpaca_news_enabled and settings.alpaca_key and settings.alpaca_secret),
         'longbridge_quote':settings.lb_enabled,'longbridge_news':settings.lb_news_enabled,
         'ai':bool(settings.ai_enabled and settings.ai_key),'notifications':bool(settings.notifications_enabled and (settings.bark_key or (settings.telegram_token and settings.telegram_chat)))}}
 
 @app.get('/api/news')
-async def news(limit:int=Query(30,ge=1,le=200),_auth=Depends(auth)):
-    return {'items':engine.db.list_rows('news',limit)}
+async def news(limit:int=Query(30,ge=1,le=200),source_type:str=Query('all',pattern='^(all|news)$'),_auth=Depends(auth)):
+    return {'items':engine.db.news_rows(limit=limit,source_type=source_type)}
+
+@app.get('/api/x/posts')
+async def x_posts(limit:int=Query(100,ge=1,le=100),
+                  username:str|None=Query(None,pattern=r'^@?[A-Za-z0-9_]{1,15}$'),_auth=Depends(auth)):
+    return {'items':engine.db.x_posts(limit=limit,username=username),'accounts':engine.db.x_accounts()}
+
+@app.post('/api/x/preview')
+async def x_preview(body:XPreviewRequest,_auth=Depends(auth)):
+    if not settings.x_bearer_token:
+        return {'state':'not_configured','items':[], 'detail':'请在设置中配置 X Bearer Token 后测试读取。'}
+    client = XClient(settings.x_bearer_token)
+    try:
+        return await preview_posts(client,body.username)
+    except XAPIError as error:
+        details = {'authentication':'X Token 验证失败，请检查设置。','permission':'X 账号读取权限不足。',
+                   'billing':'X 读取额度或计费不可用。','rate_limit':'X 请求限流，请在重试时间后读取。',
+                   'not_found':'未找到这个 X 账号。','network':'X 网络请求失败。'}
+        return {'state':'error','items':[],'kind':error.kind,'retry_at':error.retry_at,
+                'detail':details.get(error.kind,'X 数据暂不可用，请稍后重试。')}
+    finally:
+        await client.close()
 
 @app.get('/api/alerts')
 async def alerts(limit:int=Query(40,ge=1,le=200),_auth=Depends(auth)):
     return {'items':[{**r, 'last_error': config_store.redact(r['last_error'])} for r in engine.db.list_rows('alerts',limit)]}
 
+
+def sec_filter(value,validator):
+    if value is None:return None
+    try:return validator(value)
+    except ValueError:raise HTTPException(422,'无效 SEC 筛选参数')
+
+
+@app.get('/api/smart-money/overview')
+async def smart_overview(_auth=Depends(auth)):
+    result=smart_money_overview(SmartMoneyStore(engine.db),settings,engine.watchlist)
+    for source in result['sources']:source['last_error']=config_store.redact(source['last_error'])
+    return result
+
+
+@app.get('/api/smart-money/holdings')
+async def smart_holdings(cik:str|None=None,period:str|None=None,symbol:str|None=None,
+                         limit:int=Query(100,ge=1,le=500),offset:int=Query(0,ge=0),_auth=Depends(auth)):
+    return holdings_view(SmartMoneyStore(engine.db),cik=sec_filter(cik,normalize_cik),period=sec_filter(period,quarter_date),
+        symbol=sec_filter(symbol,sec_symbol),limit=limit,offset=offset,cusip_map=settings.smart_money_cusip_map)
+
+
+@app.get('/api/smart-money/insiders')
+async def smart_insiders(symbol:str|None=None,code:str|None=Query(None,pattern=r'^[A-Z]$'),derivative:bool|None=None,
+                         limit:int=Query(100,ge=1,le=500),offset:int=Query(0,ge=0),_auth=Depends(auth)):
+    store=SmartMoneyStore(engine.db)
+    return insiders_view(store,symbol=sec_filter(symbol,sec_symbol),code=code,derivative=derivative,limit=limit,offset=offset,
+        issuer_map=issuer_associations(store,settings))
+
 @app.get('/api/quotes')
 async def quotes(_auth=Depends(auth)):
-    return {'items':engine.db.list_rows('quotes',500)}
+    return {'items':engine.db.list_rows('quotes',500), 'sessions':[quote_view(Quote(**q),time.time()) for q in engine.db.session_quotes()]}
 
 @app.post('/api/send-test-alert')
 async def test_alert(_auth=Depends(auth)):
@@ -282,12 +358,13 @@ async def test_ai(body: SettingsUpdate, response: Response, _auth=Depends(auth))
 
 @app.get('/api/watchlist')
 async def watchlist(_auth=Depends(auth)):
-    return {'symbols': engine.watchlist.get('symbols', []), 'strategies': CATALOG, 'market_provider': settings.market_provider}
+    return {'instruments':engine.watchlist.get('instruments',[]), 'symbols': engine.watchlist.get('symbols', []), 'strategies': CATALOG, 'market_provider': settings.market_provider}
 
 
 @app.get('/api/market/overview')
-async def overview(provider: str = Query('yahoo', pattern='^(yahoo|alpaca|demo)$'), _auth=Depends(auth)):
-    items = await market.overview(engine.watchlist.get('symbols', []), provider)
+async def overview(provider: str = Query('yahoo', pattern='^(yahoo|alpaca|longbridge|demo)$'),
+                   session: str = Query('regular',pattern='^(pre|regular|post|overnight|all)$'), _auth=Depends(auth)):
+    items = await market.overview(engine.watchlist.get('symbols', []), provider, session)
     success = sum(not item.get('error') for item in items)
     engine.db.health('market_' + provider, 'ok' if success else 'error',
                      f'{success}/{len(items)} watchlist symbols available' + ('; synthetic demonstration' if provider == 'demo' else ''))
@@ -301,9 +378,10 @@ async def overview(provider: str = Query('yahoo', pattern='^(yahoo|alpaca|demo)$
 
 @app.get('/api/market/candles')
 async def candles(symbol: str = 'NVDA', interval: str = Query('1d', pattern='^(5m|1h|1d|1wk)$'),
-                  provider: str = Query('yahoo', pattern='^(yahoo|alpaca|demo)$'), _auth=Depends(auth)):
+                  provider: str = Query('yahoo', pattern='^(yahoo|alpaca|longbridge|demo)$'),
+                  session: str = Query('regular',pattern='^(pre|regular|post|overnight|all)$'), _auth=Depends(auth)):
     try:
-        data = await market.candles(checked_symbol(symbol), interval, provider)
+        data = await market.candles(checked_symbol(symbol), interval, provider, session)
         engine.db.health('market_' + provider, 'ok', f'{data["symbol"]}: {len(data["bars"])} {interval} bars; ' + data['source'])
         return {**data, 'indicators': indicators(data['bars']), 'strategies': strategy_snapshot(data['bars'])}
     except MarketError as exc:
@@ -313,16 +391,24 @@ async def candles(symbol: str = 'NVDA', interval: str = Query('1d', pattern='^(5
 
 @app.get('/api/strategies/backtest')
 async def run_backtest(symbol: str = 'NVDA', interval: str = Query('1d', pattern='^(5m|1h|1d|1wk)$'),
-                       provider: str = Query('yahoo', pattern='^(yahoo|alpaca|demo)$'), strategy: str = 'ema_cross',
+                       provider: str = Query('yahoo', pattern='^(yahoo|alpaca|longbridge|demo)$'),
+                       session: str = Query('regular',pattern='^(pre|regular|post|overnight|all)$'), strategy: str = 'ema_cross',
                        initial_cash: float = Query(10000, ge=100, le=100000000, allow_inf_nan=False),
                        fee_bps: float = Query(5, ge=0, le=100, allow_inf_nan=False),
                        slippage_bps: float = Query(5, ge=0, le=100, allow_inf_nan=False), _auth=Depends(auth)):
+    try:
+        instrument = market.instrument(checked_symbol(symbol))
+    except ValueError as exc:
+        raise HTTPException(422,str(exc))
+    if instrument.market != 'US' or instrument.asset_type == 'index' or session != 'regular':
+        raise HTTPException(422, '成交回测仅支持美股股票／ETF 常规时段；其他市场可查看行情与指标')
     if strategy not in {s['id'] for s in CATALOG}:
         raise HTTPException(422, '未知策略')
     try:
-        data = await market.candles(checked_symbol(symbol), interval, provider)
+        data = await market.candles(checked_symbol(symbol), interval, provider, session)
         result = backtest(data['bars'], strategy, initial_cash, fee_bps, slippage_bps)
         return {**result, 'symbol': data['symbol'], 'interval': interval, 'source': data['source'],
+                'instrument':data['instrument'], 'currency':data['currency'], 'timezone':data['timezone'], 'session':session,
                 'is_demo': data['is_demo'], 'data_notice': data['notice'], 'adjustment': data['adjustment']}
     except MarketError as exc:
         raise HTTPException(502, str(exc))
@@ -339,6 +425,7 @@ WORKSPACE_PAGES = {
     'market': ('/', 'marketSection', '市场总览'),
     'strategies': ('/strategies', 'strategySection', '策略与回测'),
     'news': ('/news', 'newsPanel', '新闻中心'),
+    'smartMoney': ('/smart-money','smartMoneySection','聪明钱'),
     'alerts': ('/alerts', 'alertsSection', '预警记录'),
     'sources': ('/sources', 'sourcesSection', '数据连接'),
     'settings': ('/settings', 'settingsSection', '设置'),
@@ -348,7 +435,7 @@ WORKSPACE_PAGES = {
 def render_dashboard(page='market'):
     _, section, label = WORKSPACE_PAGES[page]
     html = (ASSETS / 'index.html').read_text(encoding='utf-8')
-    for filename in ('dashboard.css', 'navigation.js', 'dashboard.js', 'settings.js'):
+    for filename in ('dashboard.css', 'navigation.js', 'dashboard.js', 'x_sidebar.js','smart_money.js', 'settings.js'):
         version = hashlib.sha256((ASSETS / filename).read_bytes()).hexdigest()[:12]
         html = html.replace(f'/assets/{filename}', f'/assets/{filename}?v={version}')
     html = re.sub(r'(<div id="[^"]+View" data-page="([^"]+)")(?: hidden)?(>)',
@@ -359,10 +446,12 @@ def render_dashboard(page='market'):
     html = html.replace('Market Radar · 市场研究工作台', label + ' · Market Radar')
     if page == 'settings':
         html = html.replace('id="workspaceView"', 'id="workspaceView" hidden')
+        html = html.replace('id="researchWorkspace"', 'id="researchWorkspace" hidden')
     return HTMLResponse(html, headers={'Cache-Control': 'no-store'})
 
 
 @app.get('/settings', response_class=HTMLResponse)
+@app.get('/smart-money', response_class=HTMLResponse)
 @app.get('/strategies', response_class=HTMLResponse)
 @app.get('/news', response_class=HTMLResponse)
 @app.get('/alerts', response_class=HTMLResponse)

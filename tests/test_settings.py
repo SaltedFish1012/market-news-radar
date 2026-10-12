@@ -39,7 +39,8 @@ def test_profiles_persist_independently_without_exposing_credentials(store):
     assert snapshot['revision'] == 2
     assert snapshot['ai_profiles']['gemini']['key_set']
     assert 'private-' not in json.dumps(snapshot)
-    assert os.stat(store.path).st_mode & 0o777 == 0o600
+    if os.name == 'posix':
+        assert os.stat(store.path).st_mode & 0o777 == 0o600
     candidate = restored.prepare(SettingsUpdate(revision=2, values={'ai_provider':'gemini'}))
     assert restored.settings(candidate).ai_key == 'private-gemini-test-key'
 
@@ -274,6 +275,7 @@ def test_settings_page_visible_before_js_and_assets_versioned(web_client):
 
 
 @pytest.mark.parametrize('path,expected', [('/', 'market'),('/strategies','strategies'),('/news','news'),
+                                         ('/smart-money','smartMoney'),
                                          ('/alerts','alerts'),('/sources','sources'),('/settings','settings')])
 def test_each_workspace_url_has_one_visible_page_and_real_navigation(web_client,path,expected):
     from html.parser import HTMLParser
@@ -293,7 +295,7 @@ def test_each_workspace_url_has_one_visible_page_and_real_navigation(web_client,
     assert response.status_code == 200 and response.headers['cache-control'] == 'no-store'
     parsed = Pages();parsed.feed(response.text)
     assert list(key for key,visible in parsed.pages.items() if visible) == [expected]
-    assert len(parsed.pages) == 6
-    assert {url for tag,url,_ in parsed.links} == {'/','/strategies','/news','/alerts','/sources','/settings'}
+    assert len(parsed.pages) == 7
+    assert {url for tag,url,_ in parsed.links} == {'/','/strategies','/news','/smart-money','/alerts','/sources','/settings'}
     assert all(tag == 'a' for tag,_,_ in parsed.links)
     assert sum(current == 'page' for _,_,current in parsed.links) == 1

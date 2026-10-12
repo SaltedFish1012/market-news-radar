@@ -11,9 +11,11 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator
 
 from .signals import norm_symbol
+from .smart_money_models import InstitutionConfig, normalize_cik, sec_symbol
+from .instruments import normalize_instruments, SESSIONS
 
 PROVIDERS = {
     'openai': {'name': 'OpenAI', 'base_url': 'https://api.openai.com/v1', 'protocol': 'responses',
@@ -29,7 +31,7 @@ PROVIDERS = {
                    'models': [], 'docs': 'https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create'},
 }
 SECRETS = ('ai_key', 'alpaca_key', 'alpaca_secret', 'telegram_token', 'bark_key',
-           'lb_app_key', 'lb_app_secret', 'lb_access_token')
+           'lb_app_key', 'lb_app_secret', 'lb_access_token', 'x_bearer_token')
 
 
 def checked_url(value: str, websocket=False, allow_query=False) -> str:
@@ -46,19 +48,101 @@ def checked_url(value: str, websocket=False, allow_query=False) -> str:
     return value
 
 
+class XAccount(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    username: str
+    enabled: StrictBool = True
+    push_mode: Literal['all','filtered'] = 'filtered'
+    include_replies: StrictBool = False
+    include_reposts: StrictBool = False
+    keywords: list[str] = Field(default_factory=list,max_length=50)
+    related_symbols: list[str] = Field(default_factory=list,max_length=20)
+
+    @field_validator('username')
+    @classmethod
+    def username_valid(cls,value):
+        value = value.strip().removeprefix('@')
+        if not re.fullmatch(r'[A-Za-z0-9_]{1,15}',value):
+            raise ValueError('X 用户名须为 1–15 位 ASCII 字母、数字或下划线')
+        return value
+
+    @field_validator('keywords')
+    @classmethod
+    def keywords_valid(cls,values):
+        if any(not v.strip() or len(v)>100 or any(ord(c)<32 for c in v) for v in values):
+            raise ValueError('X 关键词须为 1–100 字符且不含控制字符')
+        return list(dict.fromkeys(v.strip() for v in values))
+
+    @field_validator('related_symbols')
+    @classmethod
+    def symbols_valid(cls,values):
+        out = list(dict.fromkeys(norm_symbol(v) for v in values))
+        if '' in out: raise ValueError('X 绑定代码无效')
+        return out
+
+
 class Values(BaseModel):
     model_config = ConfigDict(extra='forbid')
+    smart_money_enabled: StrictBool | None = None
+    smart_money_poll_interval: int | None = Field(None,ge=300,le=86400,strict=True)
+    smart_money_institutions: list[InstitutionConfig] | None = Field(None,max_length=20)
+    smart_money_cusip_map: dict[str,str] | None = None
+    smart_money_issuer_map: dict[str,str] | None = None
+
+    @field_validator('smart_money_institutions')
+    @classmethod
+    def distinct_institutions(cls,values):
+        ids=[v.cik for v in (values or [])]
+        if len(ids)!=len(set(ids)):raise ValueError('机构 CIK 不能重复')
+        return values
+
+    @field_validator('smart_money_cusip_map')
+    @classmethod
+    def cusip_map_valid(cls,values):
+        if values is None:return None
+        if len(values)>200:raise ValueError('CUSIP 映射最多 200 条')
+        result={}
+        for cusip,symbol in values.items():
+            key=cusip.strip().upper()
+            if not re.fullmatch(r'[A-Z0-9*@#]{9}',key) or key in result:raise ValueError('CUSIP 无效或重复')
+            result[key]=sec_symbol(symbol)
+        return result
+
+    @field_validator('smart_money_issuer_map')
+    @classmethod
+    def issuer_map_valid(cls,values):
+        if values is None:return None
+        if len(values)>20:raise ValueError('发行人映射最多 20 条')
+        result={}
+        for symbol,cik in values.items():
+            key=sec_symbol(symbol)
+            if key in result:raise ValueError('发行人代码重复')
+            result[key]=normalize_cik(cik)
+        return result
+
+    x_enabled: StrictBool | None = None
+    x_poll_interval: int | None = Field(None,ge=60,le=3600)
+    x_accounts: list[XAccount] | None = Field(None,max_length=20)
+
+    @field_validator('x_accounts')
+    @classmethod
+    def distinct_accounts(cls,values):
+        names = [a.username.casefold() for a in (values or [])]
+        if len(set(names)) != len(names): raise ValueError('X 账号不能重复')
+        return values
+
     ai_enabled: StrictBool | None = None
     ai_provider: Literal['openai', 'gemini', 'anthropic', 'compatible'] | None = None
     ai_model: str | None = Field(None, min_length=1, max_length=150, pattern=r'^[A-Za-z0-9_.:/-]+$')
     ai_base_url: str | None = Field(None, max_length=500)
     ai_max_requests_per_hour: int | None = Field(None, ge=1, le=600)
     ai_timeout_seconds: int | None = Field(None, ge=10, le=120)
-    market_provider: Literal['yahoo', 'alpaca', 'demo'] | None = None
+    market_provider: Literal['yahoo', 'alpaca', 'demo', 'longbridge'] | None = None
     alpaca_news_enabled: StrictBool | None = None
     alpaca_url: str | None = Field(None, max_length=500)
     lb_enabled: StrictBool | None = None
     lb_news_enabled: StrictBool | None = None
+    lb_overnight_enabled: StrictBool | None = None
     lb_client_id: str | None = Field(None, max_length=200)
     notifications_enabled: StrictBool | None = None
     telegram_chat: str | None = Field(None, max_length=120)
@@ -96,6 +180,7 @@ class SecretChanges(BaseModel):
     lb_app_key: str = Field('', max_length=4096, repr=False)
     lb_app_secret: str = Field('', max_length=4096, repr=False)
     lb_access_token: str = Field('', max_length=4096, repr=False)
+    x_bearer_token: str = Field('', max_length=4096, repr=False)
 
     @field_validator('*')
     @classmethod
@@ -112,6 +197,12 @@ class PriceRule(BaseModel):
     kind: Literal['price_below', 'price_above', 'change_5m_below_pct', 'change_5m_above_pct']
     value: float = Field(allow_inf_nan=False)
     cooldown_s: int = Field(300, ge=1, le=86400)
+    sessions: list[Literal['pre','regular','post','overnight']] = Field(default_factory=lambda: list(SESSIONS), min_length=1, max_length=4)
+
+    @field_validator('sessions')
+    @classmethod
+    def unique_sessions(cls, values):
+        return list(dict.fromkeys(values))
 
     @field_validator('symbol')
     @classmethod
@@ -125,9 +216,15 @@ class PriceRule(BaseModel):
 class Watchlist(BaseModel):
     model_config = ConfigDict(extra='forbid')
     symbols: list[str] = Field(min_length=1, max_length=20)
+    instruments: list[dict] = Field(default_factory=list, max_length=20)
     theme_keywords: list[str] = Field(default_factory=list, max_length=100)
     company_map: dict[str, list[str]] = Field(default_factory=dict)
     price_rules: list[PriceRule] = Field(default_factory=list, max_length=100)
+
+    @model_validator(mode='after')
+    def metadata(self):
+        self.instruments = normalize_instruments(self.symbols, self.instruments)
+        return self
 
     @field_validator('symbols')
     @classmethod
@@ -188,7 +285,7 @@ class SettingsUpdate(BaseModel):
     values: Values = Field(default_factory=Values)
     secrets: SecretChanges = Field(default_factory=SecretChanges, repr=False)
     clear_secrets: list[Literal['ai_key', 'alpaca_key', 'alpaca_secret', 'telegram_token', 'bark_key',
-                               'lb_app_key', 'lb_app_secret', 'lb_access_token']] = Field(default_factory=list)
+                               'lb_app_key', 'lb_app_secret', 'lb_access_token', 'x_bearer_token']] = Field(default_factory=list)
     watchlist: Watchlist | None = None
     feeds: list[Feed] | None = Field(None, max_length=30)
 
@@ -250,6 +347,8 @@ class SettingsStore:
         if state['values']['ai_enabled'] and not profile['key']:
             raise ValueError('启用 AI 分析前请配置该供应商的 API Key')
         secrets = state['secrets']
+        if state['values']['x_enabled'] and (not secrets['x_bearer_token'] or not any(a['enabled'] for a in state['values']['x_accounts'])):
+            raise ValueError('启用 X 需要 Bearer Token 和至少一个启用账号')
         if state['values']['alpaca_news_enabled'] and not (secrets['alpaca_key'] and secrets['alpaca_secret']):
             raise ValueError('启用 Alpaca 新闻需要 API Key 和 Secret')
         if state['values']['notifications_enabled'] and bool(secrets['telegram_token']) != bool(state['values']['telegram_chat']):

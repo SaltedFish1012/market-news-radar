@@ -1,3 +1,15 @@
+# v0.4.0 — market sessions and attributed X speech
+- Unified instrument, market, currency, timezone and provider mappings; legacy settings remain readable
+- Four-session U.S. quote storage, freshness labels and independent session alert windows
+- Optional Longbridge 5.2+ candle adapter, safe session filtering and explicit coverage limits
+- Korean, Japanese/Nikkei and Chinese public history and indicators; guarded execution backtests
+- X specified-account polling, all/filtered pushes, silent initialization, resumable pages and durable backoff
+- Original text, author identity, reference roles, edit dedupe and atomic first-alert storage
+- Responsive session and X settings/news/status UI; instrument-aware dates, currency and CSV
+- Windows/POSIX test harness and backend/DOM regression coverage; live account acceptance remains separate
+- Alpaca regular-only minute filtering from its trading calendar and session-aligned hourly aggregation
+- Consistent live quote eligibility, request ordering, unknown Longbridge close times and monotonic latest-post status
+
 # v0.2.0 — local market research workspace
 - Responsive news, watchlist, candlestick, volume and indicator dashboard
 - Public Yahoo Finance and authenticated Alpaca IEX historical OHLCV adapters

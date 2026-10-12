@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Offline synthetic fixture following SEC 13F schema; not a real filing. -->
+<edgarSubmission xmlns="http://www.sec.gov/edgar/thirteenffiler">
+ <headerData><submissionType>13F-HR</submissionType><filerInfo><filer><credentials><cik>0001067983</cik><ccc>XXXXXXXX</ccc></credentials></filer><periodOfReport>06-30-2026</periodOfReport></filerInfo></headerData>
+ <formData><coverPage><reportCalendarOrQuarter>06-30-2026</reportCalendarOrQuarter><isAmendment>false</isAmendment><filingManager><name>Offline institution</name></filingManager><reportType>13F HOLDINGS REPORT</reportType><provideInfoForInstruction>false</provideInfoForInstruction></coverPage>
+ <summaryPage><otherIncludedManagersCount>0</otherIncludedManagersCount><tableEntryTotal>2</tableEntryTotal><tableValueTotal>3750</tableValueTotal><isConfidentialOmitted>false</isConfidentialOmitted></summaryPage></formData>
+</edgarSubmission>

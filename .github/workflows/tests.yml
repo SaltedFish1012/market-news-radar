@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - develop
+      - 'codex/**'
       - 'feature/**'
       - 'fix/**'
       - 'release/**'
@@ -37,7 +38,7 @@ jobs:
           cache: pip
       - uses: actions/setup-node@v7
         with:
-          node-version: '24.13.0'
+          node-version: '24.19.0'
           package-manager-cache: false
       - name: Install test dependencies
         run: |
@@ -49,4 +50,4 @@ jobs:
       - name: Frontend DOM tests
         env:
           NODE_PATH: ${{ runner.temp }}/radar-dom-tests/node_modules
-        run: node --test tests/frontend_settings.test.cjs
+        run: node --test tests/*.test.cjs

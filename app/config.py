@@ -20,6 +20,7 @@ class Settings:
     alpaca_url: str = os.getenv('ALPACA_NEWS_URL', 'wss://stream.data.alpaca.markets/v1beta1/news')
     lb_enabled: bool = _bool('LB_ENABLED')
     lb_news_enabled: bool = _bool('LB_NEWS_ENABLED')
+    lb_overnight_enabled: bool = _bool('LONGBRIDGE_ENABLE_OVERNIGHT', True)
     lb_app_key: str = field(default=os.getenv('LONGBRIDGE_APP_KEY', ''), repr=False)
     lb_app_secret: str = field(default=os.getenv('LONGBRIDGE_APP_SECRET', ''), repr=False)
     lb_access_token: str = field(default=os.getenv('LONGBRIDGE_ACCESS_TOKEN', ''), repr=False)
@@ -42,6 +43,15 @@ class Settings:
     rss_interval: int = max(30, int(os.getenv('RSS_INTERVAL_SECONDS', '90')))
     lb_news_interval: int = max(60, int(os.getenv('LB_NEWS_INTERVAL_SECONDS', '120')))
     news_max_age_minutes: int = int(os.getenv('NEWS_MAX_AGE_MINUTES', '25'))
+    x_enabled: bool = _bool('X_ENABLED')
+    x_bearer_token: str = field(default=os.getenv('X_BEARER_TOKEN', ''), repr=False)
+    x_poll_interval: int = int(os.getenv('X_POLL_INTERVAL_SECONDS', '120'))
+    x_accounts: list[dict] = field(default_factory=list)
+    smart_money_enabled: bool = False
+    smart_money_poll_interval: int = 900
+    smart_money_institutions: list[dict] = field(default_factory=list)
+    smart_money_cusip_map: dict[str,str] = field(default_factory=dict)
+    smart_money_issuer_map: dict[str,str] = field(default_factory=dict)
     test_mode: bool = _bool('TEST_MODE')
     watchlist_override: dict | None = field(default=None, repr=False)
     feeds_override: list | None = field(default=None, repr=False)
