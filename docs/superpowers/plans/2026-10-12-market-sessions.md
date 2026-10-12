@@ -242,11 +242,23 @@ assert Analysis(**{**valid_analysis, 'affected_symbols':['005930.KS','^N225']}).
 
 **Interfaces:** Consumes 前 8 任务；Produces 可复现的本地/CI 验收与账户验收边界。
 
-- [ ] **Step 1: 更新使用说明。** 记录 SDK 安装、四时段来源、夜盘开关、鲜度和价格规则、市场代码/币种、分钟范围及回测限制；补充 Windows 启动与 pytest/DOM 命令。CI 使用 Python 3.12、Node 24.13+、jsdom 29.1.1，执行全部前端 `*.test.cjs` 并覆盖 `codex/**` 分支。
-- [ ] **Step 2: 执行完整离线验证。** `.\.venv\Scripts\python.exe -m pytest -q`、`node --test tests/*.test.cjs`、`git diff --check`；预期零失败、无真实账户请求。记录真实输出与测试数量，不以计划代替结果。
-- [ ] **Step 3: 重启本地服务并检查。** 保留 `.env`、数据库和用户配置；健康检查、登录、四卡、默认 regular 历史查询和旧新闻仍可用。缺少 SDK/凭证时页面明确提示；真实报价权限、四时段推送和延迟单列为待账户验收，不宣称已连接。
-- [ ] **Step 4: 请求整个改动的独立代码审查并处理有效问题，再重复受影响检查。** 根据用户选择的执行方法应用对应技能，不能跳过迁移、取消竞态和时间边界审查。
-- [ ] **Step 5: 提交文档/CI并汇报。** `git commit -m "docs: document session and multi-market verification"`。不自动合并或推送；报告测试证据、账户验收限制和运行地址。
+- [x] **Step 1: 更新使用说明。** 记录 SDK 安装、四时段来源、夜盘开关、鲜度和价格规则、市场代码/币种、分钟范围及回测限制；补充 Windows 启动与 pytest/DOM 命令。CI 使用 Python 3.12、Node 24.13+、jsdom 29.1.1，执行全部前端 `*.test.cjs` 并覆盖 `codex/**` 分支。
+- [x] **Step 2: 执行完整离线验证。** `.\.venv\Scripts\python.exe -m pytest -q`、`node --test tests/*.test.cjs`、`git diff --check`；预期零失败、无真实账户请求。记录真实输出与测试数量，不以计划代替结果。
+- [x] **Step 3: 重启本地服务并检查。** 保留 `.env`、数据库和用户配置；健康检查、登录、四卡、默认 regular 历史查询和旧新闻仍可用。缺少 SDK/凭证时页面明确提示；真实报价权限、四时段推送和延迟单列为待账户验收，不宣称已连接。
+- [x] **Step 4: 请求整个改动的独立代码审查并处理有效问题，再重复受影响检查。** 根据用户选择的执行方法应用对应技能，不能跳过迁移、取消竞态和时间边界审查。
+- [x] **Step 5: 提交文档/CI并汇报。** `git commit -m "docs: document session and multi-market verification"`。不自动合并或推送；报告测试证据、账户验收限制和运行地址。
+
+## 实施验收记录（2026-10-12）
+
+- 修复后完整后端：134 passed，1 个既有 Starlette TestClient 弃用警告；DOM：25 passed；git diff --check 无错误。Python 3.12.14、Node 24.19、jsdom 29.1.1、可选长桥 SDK 5.2.0。
+- 独立整分支审查发现 3 个 Important、2 个 Minor；按用户实际影响将不可靠 closed_at 和错误的最新帖状态重评为 Important。全部五项有 RED→GREEN 回归：Alpaca 延长时段/DST/提前收市与小时合成、前端未知时段/接收时间鲜度、overview 往返选择及 quotes 请求排序、长桥未知闭市时间、X 分页最新帖时间；一轮修复后全套通过。
+- 本地 http://127.0.0.1:8787 运行实施 worktree 的代码，保留原项目 DB/config/.env；健康、登录、全部页面与设置/新闻/自选/报价 API 均为 200。默认 NVDA 日线为 regular/USD、251 根；韩股回测限制返回 422，未授权长桥历史返回明确 502 说明。
+- 重启前 SQLite backup 为 `E:/otherProj/market-news-radar/data/radar-before-v04-20261012-144013.db`；原有 153 条新闻 id/event_key/title/summary 摘要一致，.env 文件摘要一致。运行中 RSS 后续新增新闻正常。
+- 公共历史实际读取六个代码均 200：005930.KS、035900.KQ（KRW/Asia/Seoul）、7203.T、^N225（JPY/Asia/Tokyo）、600519.SS、000001.SZ（CNY/Asia/Shanghai）。未自动修改用户自选。
+- 桌面及 390×844 窄屏验证四卡与查询控件；最终窄屏无横向溢出。X 合成展示只存在预览临时 DB，未写入用户新闻。
+- 真实长桥/X/AI/推送未配置，权限、账单与真实推送延迟仍属账户验收；没有发送真实通知。
+
+执行裁决已保留：Windows 基线适配提前执行（成本：平台测试行为差异）；显式长桥配置及 SDK 5.2（成本：旧可选 SDK 需升级）；独立检查运行交付并保留工作树（成本：运行依赖该 checkout）；KOSDAQ 示例改用实测可用的 035900.KQ（成本：示例可能需后续纠正，不改用户配置）。X 账户验收裁决见 X 计划。无延期 Minor。
 
 ## 自审结果
 

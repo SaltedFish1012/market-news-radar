@@ -7,6 +7,8 @@
 - Original text, author identity, reference roles, edit dedupe and atomic first-alert storage
 - Responsive session and X settings/news/status UI; instrument-aware dates, currency and CSV
 - Windows/POSIX test harness and backend/DOM regression coverage; live account acceptance remains separate
+- Alpaca regular-only minute filtering from its trading calendar and session-aligned hourly aggregation
+- Consistent live quote eligibility, request ordering, unknown Longbridge close times and monotonic latest-post status
 
 # v0.2.0 — local market research workspace
 - Responsive news, watchlist, candlestick, volume and indicator dashboard

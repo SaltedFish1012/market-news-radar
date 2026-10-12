@@ -25,9 +25,9 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8787
 数据来源：
 
 - **公共行情 / Yahoo Finance**：无需账户，公共图表接口可能限流、延迟或中断，未承诺正式服务可用性。页面显示来源、报价时间和未收盘 K 线状态。日/周线用供应商复权价格，分钟线用原始 OHLC。[Yahoo 数据说明](https://help.yahoo.com/kb/SLN2352.html)。
-- **Alpaca / IEX**：使用现有 Alpaca 密钥，通过[官方历史 K 线接口](https://docs.alpaca.markets/us/reference/stockbarsingle-1)获取 IEX 单一交易所数据，查询结束时间保守滞后 16 分钟。IEX 成交量不等于全市场成交量。
+- **Alpaca / IEX**：使用现有 Alpaca 密钥，通过[官方历史 K 线接口](https://docs.alpaca.markets/us/reference/stockbarsingle-1)获取 IEX 单一交易所数据，查询结束时间保守滞后 16 分钟。分钟数据按[官方交易日历](https://docs.alpaca.markets/us/v1.4.2/reference/getcalendar-1)的实际开闭市时间排除延长时段，包含 DST 和提前收市；小时线由盘中 5 分钟数据合成，按当日开盘对齐。日历权限不可用时分钟查询明确报错。IEX 成交量不等于全市场成交量。
 - **演示 / 合成数据**：需要主动选择，页面和 CSV 文件名标记演示。真实接口失败不会自动替换成模拟价格。演示日期不遵循交易日历，只用于功能验证。
-- **长桥**：保留原有实时报价订阅、价格预警和股票新闻功能；新增可选 SDK 历史 K 线，最近最多 1000 根，按返回的时段标签筛选。
+- **长桥**：保留原有实时报价订阅、价格预警和股票新闻功能；新增可选 SDK 历史 K 线，最近最多 1000 根，按返回的时段标签筛选。历史响应没有当天闭市元数据，closed_at 保留 null；分钟完成状态仅在名义周期结束后保守判定，因此末根信号可能延后。
 
 回测仅做多、单股全仓、允许碎股、不加杠杆。前 60 根用于预热，期末持仓按收盘价估值，不虚构平仓。胜率只计已平仓交易；收益包含手续费与滑点，不计税、融资和成交容量。各周期使用固定历史区间（公共行情 5 分钟约 5 日、1 小时约 3 月、日线约 1 年、周线约 5 年），滚轮缩放和拖动只改变图表显示范围，不改变回测区间。历史表现不代表未来收益。
 
@@ -56,7 +56,7 @@ K 线可选 `regular/pre/post/overnight/all`，默认 `regular`。延长时段�
 | 市场 | 示例内部代码 | 币种 | IANA 时区 |
 | --- | --- | --- | --- |
 | 美国 | NVDA、SPY（NVDA.US 归一为 NVDA） | USD | America/New_York |
-| 韩国 | 005930.KS、035720.KQ | KRW | Asia/Seoul |
+| 韩国 | 005930.KS、035900.KQ | KRW | Asia/Seoul |
 | 日本／日经指数 | 7203.T、^N225 | JPY | Asia/Tokyo |
 | A 股 | 600519.SS、000001.SZ | CNY | Asia/Shanghai |
 

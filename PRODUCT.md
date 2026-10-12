@@ -88,7 +88,7 @@ The current simulation uses one stock, long-only positions, full allocation, fra
 ### Data and AI
 
 - **Market data:** Public Yahoo Finance chart data and authenticated Alpaca IEX historical candles are supported. Longbridge supplies four-session U.S. quotes, alerts and optional recent history. Yahoo supports Korean, Japanese, Nikkei and Chinese historical instruments with local currency and timezone. Execution backtests are restricted to regular-session U.S. stocks/ETFs.
-- **News:** Sources include RSS/Atom, the Alpaca news stream, and Longbridge stock news. Availability depends on enabled sources and account permissions.
+- **News:** Sources include RSS/Atom, the Alpaca news stream, Longbridge stock news and specified X accounts. X speech supports all/filtered push modes, retains complete original text, author identity and reference roles, and is explicitly labeled as user speech. Availability depends on enabled sources and account permissions.
 - **AI analysis:** Configure OpenAI, Google Gemini, Anthropic Claude, or an OpenAI-compatible service. Each provider stores its own model, endpoint, and key, with custom model IDs and connection testing. AI assists news analysis; strategy backtests execute explicit rules defined in the code.
 - **Demo data:** Users can explicitly select synthetic prices to evaluate charts and backtests. Failed real-data requests show an error rather than silently switching to demo prices.
 
