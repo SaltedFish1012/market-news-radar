@@ -53,6 +53,18 @@ class DB:
               received_at REAL NOT NULL, trade_status TEXT NOT NULL,
               PRIMARY KEY(symbol,session));
             ''')
+            columns = {r['name'] for r in self.conn.execute('PRAGMA table_info(news)')}
+            for name, declaration in [('source_type',"TEXT NOT NULL DEFAULT 'news'"),
+                    ('raw_text',"TEXT NOT NULL DEFAULT ''"),('x_metadata',"TEXT NOT NULL DEFAULT '{}'"),
+                    ('edited_at','TEXT')]:
+                if name not in columns:
+                    self.conn.execute(f'ALTER TABLE news ADD COLUMN {name} {declaration}')
+            self.conn.executescript('''
+                CREATE TABLE IF NOT EXISTS x_users (user_id TEXT PRIMARY KEY, data TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS x_user_aliases (username TEXT PRIMARY KEY, user_id TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS x_cursors (user_id TEXT PRIMARY KEY, data TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS x_post_aliases (post_id TEXT PRIMARY KEY, news_id INTEGER NOT NULL);
+            ''')
             for row in self.conn.execute('SELECT * FROM quotes').fetchall():
                 if self.conn.execute('SELECT 1 FROM session_quotes WHERE symbol=?', (row['symbol'],)).fetchone():
                     continue
@@ -76,6 +88,69 @@ class DB:
                   json.dumps(event['related_symbols']),event['priority']))
             self.conn.commit()
             return cur.lastrowid if cur.rowcount else None
+
+    def x_user(self, username: str) -> dict | None:
+        with self.lock:
+            row = self.conn.execute('SELECT data FROM x_users JOIN x_user_aliases USING(user_id) WHERE username=?',
+                                    (username.casefold().removeprefix('@'),)).fetchone()
+            return json.loads(row[0]) if row else None
+
+    def save_x_user(self, user: dict, configured_username: str):
+        with self.lock, self.conn:
+            self.conn.execute('INSERT INTO x_users VALUES (?,?) ON CONFLICT(user_id) DO UPDATE SET data=excluded.data',
+                              (user['id'],json.dumps(user,ensure_ascii=False)))
+            for name in (configured_username,user['username']):
+                self.conn.execute('INSERT INTO x_user_aliases VALUES (?,?) ON CONFLICT(username) DO UPDATE SET user_id=excluded.user_id',
+                                  (name.removeprefix('@').casefold(),user['id']))
+
+    def x_cursor(self, user_id: str) -> dict:
+        with self.lock:
+            row = self.conn.execute('SELECT data FROM x_cursors WHERE user_id=?',(user_id,)).fetchone()
+            return json.loads(row[0]) if row else {'initialized':False,'since_id':None,'retry_at':0,'failures':0}
+
+    def save_x_cursor(self, user_id: str, state: dict):
+        with self.lock, self.conn:
+            self.conn.execute('INSERT INTO x_cursors VALUES (?,?) ON CONFLICT(user_id) DO UPDATE SET data=excluded.data',
+                              (user_id,json.dumps(state,ensure_ascii=False)))
+
+    def x_states(self) -> list[dict]:
+        with self.lock:
+            return [{'user_id':r['user_id'],**json.loads(r['data'])} for r in self.conn.execute('SELECT * FROM x_cursors')]
+
+    def store_x_event(self, event: dict, alert: dict | None = None) -> tuple[int,str]:
+        meta = event['x_metadata']
+        post_id = str(meta['post_id'])
+        ids = list(dict.fromkeys([post_id,*map(str,meta.get('edit_history_ids',[]))]))
+        if any(not v.isascii() or not v.isdigit() or len(v)>64 for v in ids):
+            raise ValueError('Invalid X post identity')
+        root = min(ids,key=int)
+        with self.lock, self.conn:
+            row = self.conn.execute('SELECT n.* FROM news n JOIN x_post_aliases a ON a.news_id=n.id WHERE a.post_id IN ('+
+                ','.join('?' for _ in ids)+') LIMIT 1',ids).fetchone()
+            if row:
+                news_id = row['id']
+                previous = json.loads(row['x_metadata'])
+                status = 'duplicate'
+                if int(post_id)>int(previous['post_id']):
+                    self.conn.execute('UPDATE news SET raw_text=?,summary=?,title=?,url=?,x_metadata=?,edited_at=? WHERE id=?',
+                        (event['raw_text'],event['summary'],event['title'],event['url'],json.dumps(meta,ensure_ascii=False),
+                         event.get('edited_at') or utcnow(),news_id))
+                    status = 'updated'
+            else:
+                cur = self.conn.execute('''INSERT INTO news (event_key,source,title,summary,url,published_at,received_at,
+                    source_symbols,related_symbols,priority,source_type,raw_text,x_metadata,edited_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',('x:'+root,event['source'],event['title'],event['summary'],
+                    event['url'],event.get('published_at'),event['received_at'],json.dumps(event['source_symbols']),
+                    json.dumps(event['related_symbols']),event['priority'],'x',event['raw_text'],
+                    json.dumps(meta,ensure_ascii=False),event.get('edited_at')))
+                news_id,status = cur.lastrowid,'inserted'
+                if alert:
+                    self.conn.execute('''INSERT OR IGNORE INTO alerts
+                        (dedupe_key,news_id,title,body,severity,created_at,next_attempt_at) VALUES (?,?,?,?,?,?,?)''',
+                        ('x:'+root+':fast',news_id,alert['title'],alert['body'],alert['severity'],utcnow(),utcnow()))
+            for identity in ids:
+                self.conn.execute('INSERT OR IGNORE INTO x_post_aliases VALUES (?,?)',(identity,news_id))
+            return news_id,status
 
     def set_ai(self, news_id: int, data: dict):
         with self.lock:

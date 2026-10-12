@@ -73,7 +73,7 @@ assert XAccount(username='Example').include_reposts is False
 - Produces `DB.x_cursor(user_id: str) -> dict`、`DB.save_x_cursor(user_id: str, state: dict) -> None`、`DB.save_x_user(user: dict, configured_username: str) -> None`、`DB.x_user(username: str) -> dict | None`、`DB.x_states() -> list[dict]`。
 - Produces `DB.store_x_event(event: dict, alert: dict | None = None) -> tuple[int, str]`，状态为 `inserted/updated/duplicate`；同一事务存新闻、编辑映射与可选首报 outbox，失败全部回滚。event 包含既有新闻字段及 `source_type='x'/raw_text/x_metadata/edited_at`；x_metadata 含上文帖子字段。alert 包含 `key/title/body/severity`，key 为 `x:<编辑链初始 ID>:fast`；DB 填充实际 news_id，只在 inserted 时入队。`DB.list_rows('news')` 返回兼容默认元数据、raw_text、source_type、x_metadata（JSON 字符串）、edited_at，保持原字段。
 
-- [ ] **Step 1: 添加失败测试 `test_x_news_migration_is_repeatable`、`test_x_event_and_outbox_are_atomic`、`test_edit_chain_keeps_one_news_and_first_alert`、`test_cursor_and_user_rename_survive_restart`。** 原文 8000 字符及字面 `<b>&amp;</b>` 完整往返；同帖两次只有一条新闻/首报；模拟 alert 插入失败后新闻/编辑映射也回滚；编辑 IDs `['100','101']` 更新原 row，已有首报 body 不改；旧新闻字段默认 RSS/news，游标重开后不丢，username 改名仍指向同一 user_id。
+- [x] **Step 1: 添加失败测试 `test_x_news_migration_is_repeatable`、`test_x_event_and_outbox_are_atomic`、`test_edit_chain_keeps_one_news_and_first_alert`、`test_cursor_and_user_rename_survive_restart`。** 原文 8000 字符及字面 `<b>&amp;</b>` 完整往返；同帖两次只有一条新闻/首报；模拟 alert 插入失败后新闻/编辑映射也回滚；编辑 IDs `['100','101']` 更新原 row，已有首报 body 不改；旧新闻字段默认 RSS/news，游标重开后不丢，username 改名仍指向同一 user_id。
 
 ```python
 # test_edit_chain_keeps_one_news_and_first_alert（event 与 edited_event 共享根 ID 100）
@@ -83,10 +83,10 @@ assert db.store_x_event(edited_event, alert) == (news_id, 'updated')
 assert len(db.list_rows('news')) == 1 and len(db.due_alerts()) == 1
 assert db.list_rows('news')[0]['raw_text'] == edited_event['raw_text']
 ```
-- [ ] **Step 2: 运行失败验证。** `.\.venv\Scripts\python.exe -m pytest tests/test_x_storage.py -q`。
-- [ ] **Step 3: 实现可重复迁移和方法。** 检查 table_info 后添加新闻字段；新增 x_users（含 username alias）、x_cursors、x_post_aliases。事件身份 `x:<编辑链最初 ID 或 post_id>`，已有任何 edit alias 时复用原 row；只有更高/更新版本才更新正文，不被倒序旧编辑覆盖。存帖/outbox 原子提交后再由采集器保存页进度；中间崩溃重试依靠帖子身份去重恢复。未知用户名不能自动继承别人的游标；先验证实际 user ID。
-- [ ] **Step 4: 重跑上述命令及 `tests/test_core.py`。** 预期 PASS，普通新闻和 outbox 未改变。
-- [ ] **Step 5: 提交任务文件。** `git commit -m "feat: persist X original posts edits and polling cursors"`。
+- [x] **Step 2: 运行失败验证。** `.\.venv\Scripts\python.exe -m pytest tests/test_x_storage.py -q`。
+- [x] **Step 3: 实现可重复迁移和方法。** 检查 table_info 后添加新闻字段；新增 x_users（含 username alias）、x_cursors、x_post_aliases。事件身份 `x:<编辑链最初 ID 或 post_id>`，已有任何 edit alias 时复用原 row；只有更高/更新版本才更新正文，不被倒序旧编辑覆盖。存帖/outbox 原子提交后再由采集器保存页进度；中间崩溃重试依靠帖子身份去重恢复。未知用户名不能自动继承别人的游标；先验证实际 user ID。
+- [x] **Step 4: 重跑上述命令及 `tests/test_core.py`。** 预期 PASS，普通新闻和 outbox 未改变。
+- [x] **Step 5: 提交任务文件。** `git commit -m "feat: persist X original posts edits and polling cursors"`。
 
 ## Task 3: X 事件与两种首报策略
 
