@@ -155,6 +155,24 @@ class HoldingsResult(TypedDict):
     comparison_state: str
     complete: bool
     filings: list[Filing]
+    detail: str
+
+
+class SourceStatus(TypedDict):
+    source_key: str
+    name: str
+    enabled: bool
+    initialized: bool
+    symbols: list[str]
+    state: str
+    pending_count: int
+    last_success_at: float | None
+    last_error: str
+    retry_at: float
+    failures: int
+    coverage_start: str | None
+    coverage_end: str | None
+    coverage_state: str
 
 
 def empty_progress(source_key: str) -> Progress:

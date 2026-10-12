@@ -24,6 +24,10 @@ from .connectors import alpaca_news_loop,longbridge_quote_loop,longbridge_news_l
 from .x_news import x_news_loop, XClient, XAPIError
 from .x_views import XPreviewRequest, preview_posts
 from .smart_money import smart_money_loop
+from .smart_money_store import SmartMoneyStore
+from .smart_money_views import smart_money_overview, holdings_view, insiders_view, issuer_associations
+from .smart_money_models import normalize_cik, sec_symbol
+from .sec_13f import quarter_date
 
 logging.basicConfig(level='INFO',format='%(asctime)s %(levelname)s %(name)s: %(message)s')
 # HTTP request logs can contain Telegram/Bark credentials in paths.
@@ -209,6 +213,7 @@ async def health():
 
 @app.get('/api/status')
 async def status(_auth=Depends(auth)):
+    smart=smart_money_overview(SmartMoneyStore(engine.db),settings,engine.watchlist)
     accounts = []
     for account in settings.x_accounts:
         user = engine.db.x_user(account['username'])
@@ -216,7 +221,7 @@ async def status(_auth=Depends(auth)):
         accounts.append({'configured_username':account['username'],'enabled':settings.x_enabled and account['enabled'],
                          'user':user,**{k:cursor.get(k) for k in ('initialized','last_success_at','last_post_at','retry_at')},
                          'error':config_store.redact(cursor.get('error',''))})
-    return {'x_accounts':accounts,'source_health':[{**r, 'detail': config_store.redact(r['detail'])} for r in engine.db.list_rows('health')],'configured':{
+    return {'smart_money':{'configured':smart['configured'],'sources':[{**s,'last_error':config_store.redact(s['last_error'])} for s in smart['sources']]},'x_accounts':accounts,'source_health':[{**r, 'detail': config_store.redact(r['detail'])} for r in engine.db.list_rows('health')],'configured':{
         'x_news':bool(settings.x_enabled and settings.x_bearer_token),
         'alpaca_news':bool(settings.alpaca_news_enabled and settings.alpaca_key and settings.alpaca_secret),
         'longbridge_quote':settings.lb_enabled,'longbridge_news':settings.lb_news_enabled,
@@ -250,6 +255,34 @@ async def x_preview(body:XPreviewRequest,_auth=Depends(auth)):
 @app.get('/api/alerts')
 async def alerts(limit:int=Query(40,ge=1,le=200),_auth=Depends(auth)):
     return {'items':[{**r, 'last_error': config_store.redact(r['last_error'])} for r in engine.db.list_rows('alerts',limit)]}
+
+
+def sec_filter(value,validator):
+    if value is None:return None
+    try:return validator(value)
+    except ValueError:raise HTTPException(422,'无效 SEC 筛选参数')
+
+
+@app.get('/api/smart-money/overview')
+async def smart_overview(_auth=Depends(auth)):
+    result=smart_money_overview(SmartMoneyStore(engine.db),settings,engine.watchlist)
+    for source in result['sources']:source['last_error']=config_store.redact(source['last_error'])
+    return result
+
+
+@app.get('/api/smart-money/holdings')
+async def smart_holdings(cik:str|None=None,period:str|None=None,symbol:str|None=None,
+                         limit:int=Query(100,ge=1,le=500),offset:int=Query(0,ge=0),_auth=Depends(auth)):
+    return holdings_view(SmartMoneyStore(engine.db),cik=sec_filter(cik,normalize_cik),period=sec_filter(period,quarter_date),
+        symbol=sec_filter(symbol,sec_symbol),limit=limit,offset=offset,cusip_map=settings.smart_money_cusip_map)
+
+
+@app.get('/api/smart-money/insiders')
+async def smart_insiders(symbol:str|None=None,code:str|None=Query(None,pattern=r'^[A-Z]$'),derivative:bool|None=None,
+                         limit:int=Query(100,ge=1,le=500),offset:int=Query(0,ge=0),_auth=Depends(auth)):
+    store=SmartMoneyStore(engine.db)
+    return insiders_view(store,symbol=sec_filter(symbol,sec_symbol),code=code,derivative=derivative,limit=limit,offset=offset,
+        issuer_map=issuer_associations(store,settings))
 
 @app.get('/api/quotes')
 async def quotes(_auth=Depends(auth)):
