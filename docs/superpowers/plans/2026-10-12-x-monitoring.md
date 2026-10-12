@@ -50,7 +50,7 @@
 - Produces `XAccount(BaseModel)` 及 `Settings.x_enabled: bool = False`、`x_bearer_token: str`（repr=False）、`x_poll_interval: int = 120`、`x_accounts: list[dict]`（default_factory）；Values 增加公开字段，SecretChanges/SECRETS/clear_secrets 增加 token。
 - `SettingsStore.snapshot/prepare/settings/redact` 维持原签名，旧设置自动补默认值、不读时写回。环境变量使用 `X_ENABLED/X_BEARER_TOKEN/X_POLL_INTERVAL_SECONDS`；账号由本地设置管理。
 
-- [ ] **Step 1: 添加失败测试 `test_x_defaults_and_username_dedupe`、`test_x_limits_and_enable_requirements`、`test_x_secret_roundtrip_and_legacy_state`。** 断言如下，另覆盖非法控制字符、超过 20 账号/50 关键词、unsupported mode、enabled 但无 token 或无启用账号时拒绝；留空保留、显式清除、快照/异常不回显 token。
+- [x] **Step 1: 添加失败测试 `test_x_defaults_and_username_dedupe`、`test_x_limits_and_enable_requirements`、`test_x_secret_roundtrip_and_legacy_state`。** 断言如下，另覆盖非法控制字符、超过 20 账号/50 关键词、unsupported mode、enabled 但无 token 或无启用账号时拒绝；留空保留、显式清除、快照/异常不回显 token。
 
 ```python
 assert XAccount(username='@Example').username == 'Example'
@@ -60,10 +60,10 @@ assert XAccount(username='Example').include_reposts is False
 # Example 与 @example 同时配置必须拒绝；interval 59/3601 必须拒绝。
 ```
 
-- [ ] **Step 2: 运行失败验证。** `.\.venv\Scripts\python.exe -m pytest tests/test_x_settings.py -q`。
-- [ ] **Step 3: 实现字段与校验。** username 仅允许 1–15 位 ASCII 字母/数字/下划线，去前置 @，casefold 去重。关键词去首尾空白、去重并使用既有每词 100 字符限制；绑定代码统一规范化但不自动提升重要性。开启 X 校验配置完整；默认关闭，Token 留空保留/清除遵循现有机制。
-- [ ] **Step 4: 重跑上述命令及 `tests/test_settings.py`。** 预期 PASS，revision、原子保存和现有 secret 行为仍通过。
-- [ ] **Step 5: 提交任务文件。** `git commit -m "feat: configure X accounts and protected API token"`。
+- [x] **Step 2: 运行失败验证。** `.\.venv\Scripts\python.exe -m pytest tests/test_x_settings.py -q`。
+- [x] **Step 3: 实现字段与校验。** username 仅允许 1–15 位 ASCII 字母/数字/下划线，去前置 @，casefold 去重。关键词去首尾空白、去重并使用既有每词 100 字符限制；绑定代码统一规范化但不自动提升重要性。开启 X 校验配置完整；默认关闭，Token 留空保留/清除遵循现有机制。
+- [x] **Step 4: 重跑上述命令及 `tests/test_settings.py`。** 预期 PASS，revision、原子保存和现有 secret 行为仍通过。
+- [x] **Step 5: 提交任务文件。** `git commit -m "feat: configure X accounts and protected API token"`。
 
 ## Task 2: 完整原文、编辑链与持久游标
 
