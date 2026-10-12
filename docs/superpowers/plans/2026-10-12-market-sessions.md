@@ -174,7 +174,7 @@ assert {bar['session'] for bar in result['bars']} == {'overnight'}
 - Produces `/api/watchlist` 的 instruments；`/api/quotes` 增加 sessions（items 保留）；overview/candles/backtest 的 `session=regular` 参数与 `longbridge` provider。
 - `MarketData.overview(symbols: list[str], provider: str = 'yahoo', session: str = 'regular') -> list[dict]` 返回每标的 instrument/currency/timezone、public_quote、session_quotes、display_quote、reference_close、change_pct、source/error。选定会话无价时显示空值；regular 公共报价可作为明确标明的后备；all 优先最新鲜长桥，不能跨时段冒充。
 
-- [ ] **Step 1: 添加失败测试 `test_market_api_session_defaults_and_metadata`、`test_quote_reference_precedes_quote`、`test_mixed_overview_failure_isolation`、`test_backtest_market_guards`。** 断言旧无 session 请求仍 regular；fresh 长桥主价优先，stale 标签正确；一条日线 close 在报价之后必须排除；所有公共请求失败时 fresh 长桥四卡仍可显示；一个标的失败不吞其他结果；未知 session 422；JP/CN/KR、index、延长时段成交回测 422 且原因明确，美股 regular 原回测通过。非美股保留指标与行情查询。
+- [x] **Step 1: 添加失败测试 `test_market_api_session_defaults_and_metadata`、`test_quote_reference_precedes_quote`、`test_mixed_overview_failure_isolation`、`test_backtest_market_guards`。** 断言旧无 session 请求仍 regular；fresh 长桥主价优先，stale 标签正确；一条日线 close 在报价之后必须排除；所有公共请求失败时 fresh 长桥四卡仍可显示；一个标的失败不吞其他结果；未知 session 422；JP/CN/KR、index、延长时段成交回测 422 且原因明确，美股 regular 原回测通过。非美股保留指标与行情查询。
 
 ```python
 # test_market_api_session_defaults_and_metadata
@@ -184,10 +184,10 @@ assert overview_item['reference_close']['closed_at'] <= overview_item['display_q
 # test_backtest_market_guards
 assert jp_backtest_response.status_code == 422 and overnight_backtest_response.status_code == 422
 ```
-- [ ] **Step 2: 运行失败验证。** `.\.venv\Scripts\python.exe -m pytest tests/test_market_api.py tests/test_research.py -q`。
-- [ ] **Step 3: 实现路由与运行集成。** 用统一解析取标的，不扩大为任意字符串；保持认证和既有返回键。先检查回测资格再请求上游。overview 合并数据库各时段报价，币种和基准时间可见；未知参考价为 null。新闻行情快照采用相同鲜度/币种/时段语义。热应用标的映射、夜盘或认证变更时清行情缓存、重订阅且失效旧回调。
-- [ ] **Step 4: 重跑该命令加 `tests/test_login.py tests/test_settings.py`。** 预期 PASS。
-- [ ] **Step 5: 提交任务文件。** `git commit -m "feat: expose session quotes and guarded research APIs"`。
+- [x] **Step 2: 运行失败验证。** `.\.venv\Scripts\python.exe -m pytest tests/test_market_api.py tests/test_research.py -q`。
+- [x] **Step 3: 实现路由与运行集成。** 用统一解析取标的，不扩大为任意字符串；保持认证和既有返回键。先检查回测资格再请求上游。overview 合并数据库各时段报价，币种和基准时间可见；未知参考价为 null。新闻行情快照采用相同鲜度/币种/时段语义。热应用标的映射、夜盘或认证变更时清行情缓存、重订阅且失效旧回调。
+- [x] **Step 4: 重跑该命令加 `tests/test_login.py tests/test_settings.py`。** 预期 PASS。
+- [x] **Step 5: 提交任务文件。** `git commit -m "feat: expose session quotes and guarded research APIs"`。
 
 ## Task 7: 美股四时段页面与统一格式
 

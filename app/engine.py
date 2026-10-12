@@ -11,7 +11,7 @@ from .ai_client import request_analysis
 from .feeds import parse_dt, strip_html
 from .signals import classify, event_hash, norm_symbol, PriceRules
 from .instruments import resolve_instrument
-from .market_sessions import Quote, quote_is_eligible, SESSION_NAMES
+from .market_sessions import Quote, quote_is_eligible, quote_view, SESSION_NAMES
 
 log=logging.getLogger(__name__)
 
@@ -38,14 +38,15 @@ class Engine:
         task.add_done_callback(self.tasks.discard)
 
     def related_quote_summary(self, symbols: list[str]) -> str:
-        rows={r['symbol']:r for r in self.db.list_rows('quotes',500)}
-        out=[]
-        for s in symbols[:8]:
-            r=rows.get(norm_symbol(s))
-            if r:
-                age=(datetime.now(timezone.utc)-datetime.fromisoformat(r['observed_at'])).total_seconds()
-                if age<180:
-                    out.append(f"{s}: ${r['price']:g} (报价更新 {age:.0f}秒前)")
+        out = []
+        for symbol in symbols[:8]:
+            instrument = resolve_instrument(symbol,self.watchlist.get('instruments'))
+            rows = [quote_view(Quote(**r),time.time()) for r in self.db.session_quotes(instrument.symbol)
+                    if r['currency'] == instrument.currency]
+            fresh = [r for r in rows if r['fresh']]
+            if fresh:
+                r = max(fresh,key=lambda q:q['quote_at'])
+                out.append(f"{instrument.symbol}: {r['price']:g} {r['currency']} ({r['session_name']}，上游时间 {r['quote_at']})")
         return '; '.join(out) if out else '无足够新鲜的实时报价；禁止推测实际涨跌幅'
 
     async def ingest(self, item: dict, silent: bool = False) -> bool:

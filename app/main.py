@@ -16,6 +16,8 @@ from .ai_client import request_analysis, AIError
 from .market import MarketData, MarketError, INTERVALS
 from .strategies import CATALOG, indicators, strategy_snapshot, backtest
 from .signals import norm_symbol, PriceRules
+from .instruments import resolve_instrument
+from .market_sessions import Quote, quote_view
 from .engine import Engine, notification_loop
 from .feeds import rss_loop
 from .connectors import alpaca_news_loop,longbridge_quote_loop,longbridge_news_loop
@@ -88,7 +90,7 @@ async def apply_runtime(config):
         engine.rules = PriceRules(new_watchlist)
     engine.watchlist = new_watchlist
     market.settings = config
-    if (old.alpaca_key,old.alpaca_secret) != (config.alpaca_key,config.alpaca_secret):
+    if old != config or new_watchlist != engine.watchlist:
         market.cache.clear()
     sync_longbridge_env(config)
     if ai_changed:
@@ -112,6 +114,8 @@ async def lifespan(app:FastAPI):
     market.settings = settings
     sync_longbridge_env(settings)
     engine = Engine(settings)
+    market.db = engine.db
+    market.cache.clear()
     engine.db.health('service', 'ok', 'running')
     engine.db.health('ai', 'ready' if settings.ai_enabled else 'disabled',
                      f'{settings.ai_provider} / {settings.ai_model}; configured, not yet verified' if settings.ai_enabled else 'AI analysis paused')
@@ -212,7 +216,7 @@ async def alerts(limit:int=Query(40,ge=1,le=200),_auth=Depends(auth)):
 
 @app.get('/api/quotes')
 async def quotes(_auth=Depends(auth)):
-    return {'items':engine.db.list_rows('quotes',500)}
+    return {'items':engine.db.list_rows('quotes',500), 'sessions':[quote_view(Quote(**q),time.time()) for q in engine.db.session_quotes()]}
 
 @app.post('/api/send-test-alert')
 async def test_alert(_auth=Depends(auth)):
@@ -284,12 +288,13 @@ async def test_ai(body: SettingsUpdate, response: Response, _auth=Depends(auth))
 
 @app.get('/api/watchlist')
 async def watchlist(_auth=Depends(auth)):
-    return {'symbols': engine.watchlist.get('symbols', []), 'strategies': CATALOG, 'market_provider': settings.market_provider}
+    return {'instruments':engine.watchlist.get('instruments',[]), 'symbols': engine.watchlist.get('symbols', []), 'strategies': CATALOG, 'market_provider': settings.market_provider}
 
 
 @app.get('/api/market/overview')
-async def overview(provider: str = Query('yahoo', pattern='^(yahoo|alpaca|demo)$'), _auth=Depends(auth)):
-    items = await market.overview(engine.watchlist.get('symbols', []), provider)
+async def overview(provider: str = Query('yahoo', pattern='^(yahoo|alpaca|longbridge|demo)$'),
+                   session: str = Query('regular',pattern='^(pre|regular|post|overnight|all)$'), _auth=Depends(auth)):
+    items = await market.overview(engine.watchlist.get('symbols', []), provider, session)
     success = sum(not item.get('error') for item in items)
     engine.db.health('market_' + provider, 'ok' if success else 'error',
                      f'{success}/{len(items)} watchlist symbols available' + ('; synthetic demonstration' if provider == 'demo' else ''))
@@ -303,9 +308,10 @@ async def overview(provider: str = Query('yahoo', pattern='^(yahoo|alpaca|demo)$
 
 @app.get('/api/market/candles')
 async def candles(symbol: str = 'NVDA', interval: str = Query('1d', pattern='^(5m|1h|1d|1wk)$'),
-                  provider: str = Query('yahoo', pattern='^(yahoo|alpaca|demo)$'), _auth=Depends(auth)):
+                  provider: str = Query('yahoo', pattern='^(yahoo|alpaca|longbridge|demo)$'),
+                  session: str = Query('regular',pattern='^(pre|regular|post|overnight|all)$'), _auth=Depends(auth)):
     try:
-        data = await market.candles(checked_symbol(symbol), interval, provider)
+        data = await market.candles(checked_symbol(symbol), interval, provider, session)
         engine.db.health('market_' + provider, 'ok', f'{data["symbol"]}: {len(data["bars"])} {interval} bars; ' + data['source'])
         return {**data, 'indicators': indicators(data['bars']), 'strategies': strategy_snapshot(data['bars'])}
     except MarketError as exc:
@@ -315,16 +321,21 @@ async def candles(symbol: str = 'NVDA', interval: str = Query('1d', pattern='^(5
 
 @app.get('/api/strategies/backtest')
 async def run_backtest(symbol: str = 'NVDA', interval: str = Query('1d', pattern='^(5m|1h|1d|1wk)$'),
-                       provider: str = Query('yahoo', pattern='^(yahoo|alpaca|demo)$'), strategy: str = 'ema_cross',
+                       provider: str = Query('yahoo', pattern='^(yahoo|alpaca|longbridge|demo)$'),
+                       session: str = Query('regular',pattern='^(pre|regular|post|overnight|all)$'), strategy: str = 'ema_cross',
                        initial_cash: float = Query(10000, ge=100, le=100000000, allow_inf_nan=False),
                        fee_bps: float = Query(5, ge=0, le=100, allow_inf_nan=False),
                        slippage_bps: float = Query(5, ge=0, le=100, allow_inf_nan=False), _auth=Depends(auth)):
+    instrument = market.instrument(checked_symbol(symbol))
+    if instrument.market != 'US' or instrument.asset_type == 'index' or session != 'regular':
+        raise HTTPException(422, '成交回测仅支持美股股票／ETF 常规时段；其他市场可查看行情与指标')
     if strategy not in {s['id'] for s in CATALOG}:
         raise HTTPException(422, '未知策略')
     try:
-        data = await market.candles(checked_symbol(symbol), interval, provider)
+        data = await market.candles(checked_symbol(symbol), interval, provider, session)
         result = backtest(data['bars'], strategy, initial_cash, fee_bps, slippage_bps)
         return {**result, 'symbol': data['symbol'], 'interval': interval, 'source': data['source'],
+                'instrument':data['instrument'], 'currency':data['currency'], 'timezone':data['timezone'], 'session':session,
                 'is_demo': data['is_demo'], 'data_notice': data['notice'], 'adjustment': data['adjustment']}
     except MarketError as exc:
         raise HTTPException(502, str(exc))

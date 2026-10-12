@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 from .instruments import Instrument, resolve_instrument, SESSIONS
-from .market_sessions import bar_is_complete, bar_closed_at, classify_bar_session
+from .market_sessions import bar_is_complete, bar_closed_at, classify_bar_session, Quote, quote_view, reference_close
 
 INTERVALS = {'5m': ('5d', 300), '1h': ('3mo', 3600), '1d': ('1y', 86400), '1wk': ('5y', 604800)}
 NAMES = {'WDC': 'Western Digital', 'SNDK': 'SanDisk', 'MU': 'Micron Technology',
@@ -61,6 +61,7 @@ class MarketData:
     def __init__(self, settings):
         self.settings = settings
         self.cache = {}
+        self.db = None
         self.slots = asyncio.Semaphore(4)
 
     def instrument(self, symbol: str) -> Instrument:
@@ -210,19 +211,35 @@ class MarketData:
                 'price': price, 'quote_time': end, 'adjustment': '无',
                 'notice': '这是一组合成 K 线，日期可能包含非交易日；信号和回测仅用于演示功能，不是市场结果。'}
 
-    async def overview(self, symbols, provider='yahoo'):
+    async def overview(self, symbols, provider='yahoo', session='regular'):
         async def fetch(symbol):
+            instrument = self.instrument(symbol)
+            quotes = [quote_view(Quote(**row), time.time()) for row in
+                      (self.db.session_quotes(symbol) if self.db else []) if row['currency'] == instrument.currency]
+            allowed = [q for q in quotes if q['session'] == session or (session == 'all' and q['session'] in SESSIONS)]
+            display = max(allowed, key=lambda q:(q['fresh'],q['quote_at'] or 0), default=None)
+            item = {'symbol':instrument.symbol, 'name':instrument.name, 'instrument':asdict(instrument),
+                    'currency':instrument.currency, 'timezone':instrument.timezone, 'session':session,
+                    'session_quotes':quotes, 'public_quote':None, 'display_quote':display,
+                    'reference_close':None, 'change_pct':None, 'price':display['price'] if display else None,
+                    'source':display['source'] if display else '', 'sparkline':[], 'is_demo':provider=='demo', 'error':None}
             try:
-                data = await self.candles(symbol, '1d', provider)
-                bars = data['bars']
-                # Quote-relative change is computed against prior daily bar, never range-start close.
-                last = bars[-1]
-                previous = bars[-2]['close'] if len(bars) > 1 else None
-                price = data.get('price') or last['close']
-                return {'symbol': symbol, 'name': data['name'], 'price': price,
-                        'change_pct': (price / previous - 1) * 100 if previous else None,
-                        'quote_time': data.get('quote_time'), 'source': data['source'], 'is_demo': data['is_demo'],
-                        'sparkline': [b['close'] for b in bars[-24:]], 'error': None}
+                data = await self.candles(symbol, '1d', provider, 'regular')
+                public = {'symbol':symbol, 'price':data.get('price'), 'quote_at':data.get('quote_time'),
+                          'currency':instrument.currency, 'source':data['source'], 'session':'regular',
+                          'status':'合成演示' if data['is_demo'] else '公共／历史报价', 'fresh':False}
+                item.update(name=data['name'],public_quote=public,sparkline=[b['close'] for b in data['bars'][-24:]])
+                if session in ('regular','all') and not (display and display['fresh']):
+                    item['display_quote'] = public if public['price'] is not None else display
+                chosen = item['display_quote']
+                if chosen and isinstance(chosen.get('quote_at'),(int,float)):
+                    item['reference_close'] = reference_close(data['bars'],chosen['quote_at'])
             except MarketError as exc:
-                return {'symbol': symbol, 'name': NAMES.get(symbol, symbol), 'error': str(exc), 'price': None}
+                item['error'] = str(exc)
+            chosen, ref = item['display_quote'], item['reference_close']
+            if chosen:
+                item.update(price=chosen['price'],source=chosen['source'],quote_time=chosen['quote_at'])
+                if ref and chosen['price'] is not None:
+                    item['change_pct'] = (chosen['price']/ref['price']-1)*100
+            return item
         return await asyncio.gather(*(fetch(s) for s in symbols[:20]))
