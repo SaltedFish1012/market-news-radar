@@ -20,6 +20,7 @@ class Settings:
     alpaca_url: str = os.getenv('ALPACA_NEWS_URL', 'wss://stream.data.alpaca.markets/v1beta1/news')
     lb_enabled: bool = _bool('LB_ENABLED')
     lb_news_enabled: bool = _bool('LB_NEWS_ENABLED')
+    lb_overnight_enabled: bool = _bool('LONGBRIDGE_ENABLE_OVERNIGHT', True)
     lb_app_key: str = field(default=os.getenv('LONGBRIDGE_APP_KEY', ''), repr=False)
     lb_app_secret: str = field(default=os.getenv('LONGBRIDGE_APP_SECRET', ''), repr=False)
     lb_access_token: str = field(default=os.getenv('LONGBRIDGE_ACCESS_TOKEN', ''), repr=False)

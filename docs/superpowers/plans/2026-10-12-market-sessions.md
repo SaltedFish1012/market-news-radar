@@ -56,7 +56,7 @@ $env:NODE_PATH = Join-Path $env:TEMP 'radar-dom-tests/node_modules'
 - `Watchlist.instruments` 保存元数据列表；`PriceRule.sessions` 默认 `['pre','regular','post','overnight']`。`Settings.lb_overnight_enabled` 从 `LONGBRIDGE_ENABLE_OVERNIGHT` 初始化。`signals.norm_symbol` 保持现有名称并委托统一解析。
 - US/KR/JP/CN 默认币种与时区遵循设计表；映射仅生成该市场支持的供应商代码。元数据可编辑，但 market/currency/timezone 必须一致；未自选的常见后缀仍可解析。美股指数不能生成股票长桥映射。
 
-- [ ] **Step 1: 添加失败测试 `test_symbol_aliases_and_leading_zeros`、`test_metadata_conflicts`、`test_old_settings_migrate_only_in_memory`。** 断言如下；配置测试另断言旧文件字节、密钥、AI profiles、feeds、revision 不变，保存后才包含元数据和 sessions。
+- [x] **Step 1: 添加失败测试 `test_symbol_aliases_and_leading_zeros`、`test_metadata_conflicts`、`test_old_settings_migrate_only_in_memory`。** 断言如下；配置测试另断言旧文件字节、密钥、AI profiles、feeds、revision 不变，保存后才包含元数据和 sessions。
 
 ```python
 assert normalize_symbol(' nvda.US ') == 'NVDA'
@@ -66,10 +66,10 @@ assert normalize_symbol('../NVDA') == ''
 # 相同内部代码存在矛盾元数据、未知市场代码、指数声明为 stock 均抛 ValueError。
 ```
 
-- [ ] **Step 2: 运行失败验证。** ` .\.venv\Scripts\python.exe -m pytest tests/test_instruments.py tests/test_settings.py -q`；新增测试因缺少模型或字段失败。
-- [ ] **Step 3: 实现上述接口与配置迁移。** 按结构验证 US ticker、6 位 `.KS/.KQ/.SS/.SZ`、4 位 `.T` 和已知指数；保留前导零，provider 路径仍在请求时编码。拒绝空 sessions、未知 session、元数据与自选矛盾；兼容旧规则字段。补齐旧字段时不重写磁盘，保持原子保存与冲突响应；新字段进入 snapshot 和运行配置。增加 `tzdata`，示例自选仍保持现有美股。
-- [ ] **Step 4: 重跑同一命令。** 预期全部 PASS，包括 revision 冲突、保存失败和密钥隐藏的原测试。
-- [ ] **Step 5: 提交任务文件。** `git commit -m "feat: unify instrument metadata and session settings"`。
+- [x] **Step 2: 运行失败验证。** ` .\.venv\Scripts\python.exe -m pytest tests/test_instruments.py tests/test_settings.py -q`；新增测试因缺少模型或字段失败。
+- [x] **Step 3: 实现上述接口与配置迁移。** 按结构验证 US ticker、6 位 `.KS/.KQ/.SS/.SZ`、4 位 `.T` 和已知指数；保留前导零，provider 路径仍在请求时编码。拒绝空 sessions、未知 session、元数据与自选矛盾；兼容旧规则字段。补齐旧字段时不重写磁盘，保持原子保存与冲突响应；新字段进入 snapshot 和运行配置。增加 `tzdata`，示例自选仍保持现有美股。
+- [x] **Step 4: 重跑同一命令。** 预期全部 PASS，包括 revision 冲突、保存失败和密钥隐藏的原测试。
+- [x] **Step 5: 提交任务文件。** `git commit -m "feat: unify instrument metadata and session settings"`。
 
 ## Task 2: 报价模型、鲜度和数据库迁移
 

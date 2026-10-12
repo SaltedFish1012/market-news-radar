@@ -11,9 +11,10 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator
 
 from .signals import norm_symbol
+from .instruments import normalize_instruments, SESSIONS
 
 PROVIDERS = {
     'openai': {'name': 'OpenAI', 'base_url': 'https://api.openai.com/v1', 'protocol': 'responses',
@@ -54,11 +55,12 @@ class Values(BaseModel):
     ai_base_url: str | None = Field(None, max_length=500)
     ai_max_requests_per_hour: int | None = Field(None, ge=1, le=600)
     ai_timeout_seconds: int | None = Field(None, ge=10, le=120)
-    market_provider: Literal['yahoo', 'alpaca', 'demo'] | None = None
+    market_provider: Literal['yahoo', 'alpaca', 'demo', 'longbridge'] | None = None
     alpaca_news_enabled: StrictBool | None = None
     alpaca_url: str | None = Field(None, max_length=500)
     lb_enabled: StrictBool | None = None
     lb_news_enabled: StrictBool | None = None
+    lb_overnight_enabled: StrictBool | None = None
     lb_client_id: str | None = Field(None, max_length=200)
     notifications_enabled: StrictBool | None = None
     telegram_chat: str | None = Field(None, max_length=120)
@@ -112,6 +114,12 @@ class PriceRule(BaseModel):
     kind: Literal['price_below', 'price_above', 'change_5m_below_pct', 'change_5m_above_pct']
     value: float = Field(allow_inf_nan=False)
     cooldown_s: int = Field(300, ge=1, le=86400)
+    sessions: list[Literal['pre','regular','post','overnight']] = Field(default_factory=lambda: list(SESSIONS), min_length=1, max_length=4)
+
+    @field_validator('sessions')
+    @classmethod
+    def unique_sessions(cls, values):
+        return list(dict.fromkeys(values))
 
     @field_validator('symbol')
     @classmethod
@@ -125,9 +133,15 @@ class PriceRule(BaseModel):
 class Watchlist(BaseModel):
     model_config = ConfigDict(extra='forbid')
     symbols: list[str] = Field(min_length=1, max_length=20)
+    instruments: list[dict] = Field(default_factory=list, max_length=20)
     theme_keywords: list[str] = Field(default_factory=list, max_length=100)
     company_map: dict[str, list[str]] = Field(default_factory=dict)
     price_rules: list[PriceRule] = Field(default_factory=list, max_length=100)
+
+    @model_validator(mode='after')
+    def metadata(self):
+        self.instruments = normalize_instruments(self.symbols, self.instruments)
+        return self
 
     @field_validator('symbols')
     @classmethod

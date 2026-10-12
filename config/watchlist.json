@@ -1,5 +1,6 @@
 {
   "symbols": ["WDC", "SNDK", "MU", "NVDA", "AVGO", "AMD", "SPY", "QQQ", "SOXX"],
+  "instruments": [],
   "theme_keywords": ["OpenAI", "Anthropic", "AI infrastructure", "AI spending", "Federal Reserve", "NVIDIA", "Micron", "SK Hynix", "Western Digital", "Sandisk", "semiconductor", "CPI", "nonfarm payrolls"],
   "company_map": {
     "openai": ["MSFT", "ORCL", "NVDA", "AVGO", "MU"],

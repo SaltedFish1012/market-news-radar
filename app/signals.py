@@ -2,6 +2,7 @@ from __future__ import annotations
 from collections import defaultdict, deque
 from datetime import datetime, timezone
 import hashlib, re, time
+from .instruments import normalize_symbol
 
 MATERIAL = (
     'misses estimates','beats estimates','lowered guidance','cuts guidance','raises guidance',
@@ -16,8 +17,7 @@ MAJOR = ('bankruptcy','default','fraud','halted','fomc','interest rate','rate hi
 
 
 def norm_symbol(raw: str) -> str:
-    raw=raw.upper().strip().removesuffix('.US')
-    return raw if re.fullmatch(r'[A-Z][A-Z0-9.\-]{0,9}', raw) else ''
+    return normalize_symbol(raw)
 
 
 def matched_keywords(text: str, keywords: list[str]) -> list[str]:
