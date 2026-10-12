@@ -166,7 +166,7 @@ assert retry_delay(XAPIError('rate_limit', 429, 2800), 1, 1000) == 1800
 - Consumes X settings snapshot/status/news 新字段和行情计划的 DOM helper。
 - Produces `appendXAccount(account: dict) -> void`、`renderXPost(row: dict) -> string`（只生成已 escape 的文本/安全链接）；X 区域与原新闻列表共同使用既有设置保存/新闻搜索交互。
 
-- [ ] **Step 1: 添加失败 DOM 测试 `X account settings preserve secrets and submit both modes`、`X speech shows author full text references and edits safely`、`X search includes complete original text`、`X account status shows last success and permission errors`。** 默认 filtered/replies false/reposts false；token input 不回填、空保留/勾选清除；作者 name 含 HTML 和 raw_text 含 `<img onerror>` 显示为字面文本，DOM 没有恶意 img/script；8000 字原文可展开；引用/转帖角色明确、编辑标签可见；搜索能找到摘录之外的正文；展示费用提示、错误/退避与上次成功，不把无新帖判为离线。
+- [x] **Step 1: 添加失败 DOM 测试 `X account settings preserve secrets and submit both modes`、`X speech shows author full text references and edits safely`、`X search includes complete original text`、`X account status shows last success and permission errors`。** 默认 filtered/replies false/reposts false；token input 不回填、空保留/勾选清除；作者 name 含 HTML 和 raw_text 含 `<img onerror>` 显示为字面文本，DOM 没有恶意 img/script；8000 字原文可展开；引用/转帖角色明确、编辑标签可见；搜索能找到摘录之外的正文；展示费用提示、错误/退避与上次成功，不把无新帖判为离线。
 
 ```javascript
 // X account settings preserve secrets and submit both modes
@@ -176,10 +176,10 @@ assert.equal(saved.values.x_accounts[0].push_mode, 'all');
 assert.equal(app.document.querySelectorAll('.x-original-text img, .x-original-text script').length, 0);
 assert.equal(app.document.querySelector('.x-original-text').textContent, originalText);
 ```
-- [ ] **Step 2: 运行失败验证。** `node --test tests/frontend_x.test.cjs tests/frontend_settings.test.cjs`。
-- [ ] **Step 3: 实现页面。** “行情与新闻”中新增 X Token/启用/interval/账号编辑/模式/类型/关键词/绑定标的；采集启用提示 API 读取可能收费并链接 [官方计费说明](https://docs.x.com/x-api/getting-started/pricing) 和开发者控制台，不显示未经核对单价。新闻卡固定标签“X 用户言论”、name/@username、时间、原文链接、完整原文展开与编辑标记。正文用 textContent 或统一 esc，不用 HTML 剥离。sources 按账号显示成功/权限/额度/退避状态；现有 RSS 卡和页面独立加载行为保留。更新资源版本。
-- [ ] **Step 4: 重跑 DOM 命令和 `tests/test_x_settings.py tests/test_x_runtime.py`。** 预期 PASS；本地浏览器检查长帖、配置行在窄屏和桌面可阅读，无秘密回显和控制台异常。
-- [ ] **Step 5: 提交任务文件。** `git commit -m "feat: expose X monitoring settings and original speech UI"`。
+- [x] **Step 2: 运行失败验证。** `node --test tests/frontend_x.test.cjs tests/frontend_settings.test.cjs`。
+- [x] **Step 3: 实现页面。** “行情与新闻”中新增 X Token/启用/interval/账号编辑/模式/类型/关键词/绑定标的；采集启用提示 API 读取可能收费并链接 [官方计费说明](https://docs.x.com/x-api/getting-started/pricing) 和开发者控制台，不显示未经核对单价。新闻卡固定标签“X 用户言论”、name/@username、时间、原文链接、完整原文展开与编辑标记。正文用 textContent 或统一 esc，不用 HTML 剥离。sources 按账号显示成功/权限/额度/退避状态；现有 RSS 卡和页面独立加载行为保留。更新资源版本。
+- [x] **Step 4: 重跑 DOM 命令和 `tests/test_x_settings.py tests/test_x_runtime.py`。** 预期 PASS；本地浏览器检查长帖、配置行在窄屏和桌面可阅读，无秘密回显和控制台异常。
+- [x] **Step 5: 提交任务文件。** `git commit -m "feat: expose X monitoring settings and original speech UI"`。
 
 ## Task 7: 完整回归、说明与运行交付
 
