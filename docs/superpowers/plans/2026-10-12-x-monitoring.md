@@ -96,7 +96,7 @@ assert db.list_rows('news')[0]['raw_text'] == edited_event['raw_text']
 - Consumes `XAccount`、DB 原子存帖接口及 `classify/matched_keywords`。
 - Produces `x_should_push(post: dict, account: dict, watchlist: dict, priority: str) -> bool`、`x_alert(event: dict, account: dict, related: list[str]) -> dict`；`Engine.ingest_x(post: dict, account: dict, *, silent: bool = False) -> bool`（已归档/更新/去重都为 True，无法归档则抛错误）。现有 `ingest(item, silent=False)` 默认策略不变。
 
-- [ ] **Step 1: 添加失败测试 `test_all_mode_pushes_info_once`、`test_filtered_matches_full_text_or_importance`、`test_initial_old_invalid_and_edit_are_silent`、`test_reference_author_and_literal_text_are_preserved`。** all+info+空关键词有一条首报；filtered 正文第 1600 字之后的中文关键词可触发；账号关键词优先全局，无关键词时仅 high/critical；绑定标的不强制升级；初始化、age > news_max_age_minutes、未来 >300 秒或无有效时间仅归档；编辑不重复首报；引用帖通知区分当前作者与引用作者。AI 禁用仍完整归档与通知，AI 慢/失败不阻塞首报。
+- [x] **Step 1: 添加失败测试 `test_all_mode_pushes_info_once`、`test_filtered_matches_full_text_or_importance`、`test_initial_old_invalid_and_edit_are_silent`、`test_reference_author_and_literal_text_are_preserved`。** all+info+空关键词有一条首报；filtered 正文第 1600 字之后的中文关键词可触发；账号关键词优先全局，无关键词时仅 high/critical；绑定标的不强制升级；初始化、age > news_max_age_minutes、未来 >300 秒或无有效时间仅归档；编辑不重复首报；引用帖通知区分当前作者与引用作者。AI 禁用仍完整归档与通知，AI 慢/失败不阻塞首报。
 
 ```python
 # test_filtered_matches_full_text_or_importance
@@ -105,10 +105,10 @@ assert not x_should_push({'raw_text':'普通言论'}, {'push_mode':'filtered','k
 # test_all_mode_pushes_info_once
 assert len(engine.db.due_alerts()) == 1 and engine.db.due_alerts()[0]['title'] == 'X 用户言论 · @Example'
 ```
-- [ ] **Step 2: 运行失败验证。** `.\.venv\Scripts\python.exe -m pytest tests/test_x_pipeline.py -q`。
-- [ ] **Step 3: 实现事件处理和文案。** X 文本不经过 strip_html，以完整 raw_text 匹配/分类，title/summary 是独立摘录。先判断时间、模式与 silent，生成可选 alert，再调用原子 DB 存储；updated/duplicate 不启动重复首报或重复 AI。标题固定 `X 用户言论 · @用户名`，正文包含作者、发布时间、明确“正文摘录”、原文链接、关联标的说明；Bark/Telegram 长度沿用当前通道限制，完整文本始终在归档。AI 保留现有重要性和请求额度条件，输入包含 source_type/作者/原文/引用关系，要求区分发表行为与内容真实性。
-- [ ] **Step 4: 重跑上述命令及 `tests/test_core.py tests/test_settings.py`。** 预期 PASS；现有 info 新闻仍仅归档。
-- [ ] **Step 5: 提交任务文件。** `git commit -m "feat: archive X speech and apply per-account push policies"`。
+- [x] **Step 2: 运行失败验证。** `.\.venv\Scripts\python.exe -m pytest tests/test_x_pipeline.py -q`。
+- [x] **Step 3: 实现事件处理和文案。** X 文本不经过 strip_html，以完整 raw_text 匹配/分类，title/summary 是独立摘录。先判断时间、模式与 silent，生成可选 alert，再调用原子 DB 存储；updated/duplicate 不启动重复首报或重复 AI。标题固定 `X 用户言论 · @用户名`，正文包含作者、发布时间、明确“正文摘录”、原文链接、关联标的说明；Bark/Telegram 长度沿用当前通道限制，完整文本始终在归档。AI 保留现有重要性和请求额度条件，输入包含 source_type/作者/原文/引用关系，要求区分发表行为与内容真实性。
+- [x] **Step 4: 重跑上述命令及 `tests/test_core.py tests/test_settings.py`。** 预期 PASS；现有 info 新闻仍仅归档。
+- [x] **Step 5: 提交任务文件。** `git commit -m "feat: archive X speech and apply per-account push policies"`。
 
 ## Task 4: 官方读取、分页与恢复
 

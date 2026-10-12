@@ -93,6 +93,32 @@ class Engine:
         self.ai_quota.append(now)
         return True
 
+    async def ingest_x(self, post: dict, account: dict, *, silent: bool = False) -> bool:
+        from .x_events import x_should_push, x_alert
+        raw = str(post.get('raw_text',''))
+        published = None
+        try:
+            stamp = datetime.fromisoformat(str(post.get('created_at','')).replace('Z','+00:00'))
+            if stamp.tzinfo is not None:
+                published = stamp.astimezone(timezone.utc).isoformat()
+        except (ValueError,TypeError):
+            pass
+        # Account bindings describe exposure and must not manufacture importance.
+        priority,related,_ = classify('',raw,[],self.watchlist,'X 用户言论')
+        related = sorted(set(related) | set(account.get('related_symbols',[])))
+        root = min([str(post['post_id']),*map(str,post.get('edit_history_ids',[]))],key=int)
+        event = {'event_key':'x:'+root,'source':'X 用户言论','source_type':'x',
+            'title':'X 用户言论 · @'+post['username'],'summary':raw[:1500], 'raw_text':raw,
+            'url':f"https://x.com/{post['username']}/status/{post['post_id']}",
+            'published_at':published,'received_at':utcnow(),'source_symbols':[],
+            'related_symbols':related,'priority':priority,'x_metadata':dict(post),'edited_at':None}
+        age = (datetime.now(timezone.utc)-datetime.fromisoformat(published)).total_seconds() if published else None
+        push = not silent and age is not None and -300 <= age <= self.settings.news_max_age_minutes*60 and x_should_push(post,account,self.watchlist,priority)
+        news_id,status = self.db.store_x_event(event,x_alert(event,account,related) if push else None)
+        if status == 'inserted' and push and priority in ('high','critical') and self.settings.ai_enabled and self.settings.ai_key:
+            self.spawn(self.analyze(news_id,event))
+        return True
+
     async def analyze(self, news_id: int, event: dict):
         if not self.reserve_ai_request():
             return
