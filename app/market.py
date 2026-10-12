@@ -158,7 +158,8 @@ class MarketData:
         return {'bars': bars, 'provider': 'yahoo' , 'source': 'Yahoo Finance · 公共行情',
                 'name': instrument.name if instrument.name != symbol else meta.get('longName') or meta.get('shortName') or NAMES.get(symbol, symbol),
                 'currency': instrument.currency, 'exchange': meta.get('exchangeName', ''),
-                'price': meta.get('regularMarketPrice'), 'quote_time': meta.get('regularMarketTime'),
+                'price': meta.get('regularMarketPrice') if session == 'regular' else (bars[-1]['close'] if bars else None),
+                'quote_time': meta.get('regularMarketTime') if session == 'regular' else (bars[-1]['time'] if bars else None),
                 'previous_close': meta.get('chartPreviousClose') if interval == '5m' else None,
                 'adjustment': '日/周线采用供应商复权价格；分钟线按原始 OHLC',
                 'is_demo': False, 'notice': '公共接口可能延迟或中断；分钟历史区间有限。时段和收盘依据供应商元数据，缺失时保守标为未知或未收盘。'}

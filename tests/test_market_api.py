@@ -13,7 +13,7 @@ def test_backtest_market_guards(web_client, monkeypatch):
     async def forbidden(*args, **kwargs):
         raise AssertionError('guard must precede upstream request')
     monkeypatch.setattr(main.market, 'candles', forbidden)
-    for params in [{'symbol':'7203.T'}, {'symbol':'^N225'}, {'symbol':'NVDA','session':'overnight'}]:
+    for params in [{'symbol':'7203.T'}, {'symbol':'^N225'}, {'symbol':'^UNKNOWN'}, {'symbol':'NVDA','session':'overnight'}]:
         response = web_client.get('/api/strategies/backtest', params=params)
         assert response.status_code == 422
     assert web_client.get('/api/market/candles?session=invalid').status_code == 422

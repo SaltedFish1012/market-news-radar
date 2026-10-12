@@ -131,7 +131,7 @@ async def lifespan(app:FastAPI):
         engine.db.health('service','stopped','shutdown')
         engine.db.conn.close()
 
-app=FastAPI(title='Market News Radar',description='News-first US equity alert prototype; never trades',version='0.3.0',lifespan=lifespan)
+app=FastAPI(title='Market News Radar',description='Multi-market research and attributed news; never trades',version='0.4.0',lifespan=lifespan)
 
 
 @app.exception_handler(RequestValidationError)
@@ -337,7 +337,10 @@ async def run_backtest(symbol: str = 'NVDA', interval: str = Query('1d', pattern
                        initial_cash: float = Query(10000, ge=100, le=100000000, allow_inf_nan=False),
                        fee_bps: float = Query(5, ge=0, le=100, allow_inf_nan=False),
                        slippage_bps: float = Query(5, ge=0, le=100, allow_inf_nan=False), _auth=Depends(auth)):
-    instrument = market.instrument(checked_symbol(symbol))
+    try:
+        instrument = market.instrument(checked_symbol(symbol))
+    except ValueError as exc:
+        raise HTTPException(422,str(exc))
     if instrument.market != 'US' or instrument.asset_type == 'index' or session != 'regular':
         raise HTTPException(422, '成交回测仅支持美股股票／ETF 常规时段；其他市场可查看行情与指标')
     if strategy not in {s['id'] for s in CATALOG}:

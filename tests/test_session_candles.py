@@ -58,6 +58,7 @@ def test_yahoo_session_request_and_cache(monkeypatch):
         regular=await market.candles('NVDA','5m','yahoo','regular')
         all_data=await market.candles('NVDA','5m','yahoo','all')
         assert pre['bars'][0]['close'] == 99 and len(pre['bars']) == 1
+        assert pre['price'] == 99 and pre['quote_time'] == opening-300
         assert regular['bars'][0]['close'] == 100 and len(regular['bars']) == 1
         assert len(all_data['bars']) == 2 and len(requests) == 3
         assert requests[0].url.params['includePrePost'] == 'true'
