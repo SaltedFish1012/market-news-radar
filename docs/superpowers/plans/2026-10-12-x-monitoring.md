@@ -144,7 +144,7 @@ assert 'note_post' in captured_request.url.params['post.fields']
 - Consumes `XClient/poll_account` 和持久 cursor。
 - Produces `async x_news_loop(engine: object, settings: object) -> None`；`retry_delay(error: XAPIError, failures: int, now: float) -> float`；`/api/status.configured.x_news` 与 `x_accounts`（稳定 id、公开作者、启用状态、last_success_at/last_post_at/retry_at/error，无 Token）。
 
-- [ ] **Step 1: 添加失败测试 `test_rate_limits_and_backoff_persist`、`test_single_account_error_does_not_block_others`、`test_settings_restart_only_x_job_and_cancel_pending_write`、`test_remove_readd_and_rename_keep_user_cursor`。** 429 的 Retry-After 秒/HTTP 日期和 x-rate-limit-reset 都可识别，可靠等待值不被 15 分钟本地上限截短，无可靠值指数至 900 秒；网络 5→300 秒；401/403 至少 300 秒且状态明确，账单错误不自动重试充值。重启前 retry_at 保留；取消 await HTTP/休眠立即停止，已返回数据在归档前再次检查任务状态；账号 B 在 A 错误/退避时仍采集；同用户移除重加不初始化，用户名重新分配的新 ID 必须重新初始化。
+- [x] **Step 1: 添加失败测试 `test_rate_limits_and_backoff_persist`、`test_single_account_error_does_not_block_others`、`test_settings_restart_only_x_job_and_cancel_pending_write`、`test_remove_readd_and_rename_keep_user_cursor`。** 429 的 Retry-After 秒/HTTP 日期和 x-rate-limit-reset 都可识别，可靠等待值不被 15 分钟本地上限截短，无可靠值指数至 900 秒；网络 5→300 秒；401/403 至少 300 秒且状态明确，账单错误不自动重试充值。重启前 retry_at 保留；取消 await HTTP/休眠立即停止，已返回数据在归档前再次检查任务状态；账号 B 在 A 错误/退避时仍采集；同用户移除重加不初始化，用户名重新分配的新 ID 必须重新初始化。
 
 ```python
 # test_rate_limits_and_backoff_persist（failures=1 为第一次失败）
@@ -153,10 +153,10 @@ assert retry_delay(XAPIError('network', None, None), 20, 1000) == 300
 assert retry_delay(XAPIError('rate_limit', 429, None), 20, 1000) == 900
 assert retry_delay(XAPIError('rate_limit', 429, 2800), 1, 1000) == 1800
 ```
-- [ ] **Step 2: 运行失败验证。** `.\.venv\Scripts\python.exe -m pytest tests/test_x_runtime.py -q`。
-- [ ] **Step 3: 实现循环及热应用。** 轮次按 monotonic 起始时刻安排间隔，不对每账号加固定休眠；每账号独立持久 retry_at，其他账号继续。记录最近成功轮询、最新帖时间与安全错误，无新帖仍为成功。JOB_FUNCTIONS 增加 x_news；只在 X token/开关/账号/interval 变化时重启该任务，关闭或删除账号保留历史。配置改变清无效页 token，不清完成游标；重新添加/改名需官方确认 ID，不能仅依赖永久 username alias。睡眠可取消，任务停止不再写 DB/outbox；所有 status 和 health detail 经 redact。
-- [ ] **Step 4: 重跑上述命令及 `tests/test_settings.py tests/test_login.py`。** 预期 PASS；修改 X 配置不重启 RSS/行情/通知任务，既有认证保持。
-- [ ] **Step 5: 提交任务文件。** `git commit -m "feat: schedule X polling with backoff and account health"`。
+- [x] **Step 2: 运行失败验证。** `.\.venv\Scripts\python.exe -m pytest tests/test_x_runtime.py -q`。
+- [x] **Step 3: 实现循环及热应用。** 轮次按 monotonic 起始时刻安排间隔，不对每账号加固定休眠；每账号独立持久 retry_at，其他账号继续。记录最近成功轮询、最新帖时间与安全错误，无新帖仍为成功。JOB_FUNCTIONS 增加 x_news；只在 X token/开关/账号/interval 变化时重启该任务，关闭或删除账号保留历史。配置改变清无效页 token，不清完成游标；重新添加/改名需官方确认 ID，不能仅依赖永久 username alias。睡眠可取消，任务停止不再写 DB/outbox；所有 status 和 health detail 经 redact。
+- [x] **Step 4: 重跑上述命令及 `tests/test_settings.py tests/test_login.py`。** 预期 PASS；修改 X 配置不重启 RSS/行情/通知任务，既有认证保持。
+- [x] **Step 5: 提交任务文件。** `git commit -m "feat: schedule X polling with backoff and account health"`。
 
 ## Task 6: X 设置、新闻原文与来源状态页面
 

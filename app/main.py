@@ -21,6 +21,7 @@ from .market_sessions import Quote, quote_view
 from .engine import Engine, notification_loop
 from .feeds import rss_loop
 from .connectors import alpaca_news_loop,longbridge_quote_loop,longbridge_news_loop
+from .x_news import x_news_loop
 
 logging.basicConfig(level='INFO',format='%(asctime)s %(levelname)s %(name)s: %(message)s')
 # HTTP request logs can contain Telegram/Bark credentials in paths.
@@ -32,6 +33,7 @@ config_store: SettingsStore | None = None
 settings_lock = asyncio.Lock()
 jobs = {}
 JOB_FUNCTIONS = {'rss': rss_loop, 'alpaca_news': alpaca_news_loop,
+                 'x_news':x_news_loop,
                  'longbridge_quote': longbridge_quote_loop, 'longbridge_news': longbridge_news_loop,
                  'notification': notification_loop}
 
@@ -69,6 +71,7 @@ async def apply_runtime(config):
     global settings
     old = settings
     groups = {
+        'x_news':('x_enabled','x_bearer_token','x_poll_interval','x_accounts'),
         'rss': ('rss_interval', 'sec_contact', 'feeds_override'),
         'alpaca_news': ('alpaca_key', 'alpaca_secret', 'alpaca_url', 'alpaca_news_enabled'),
         'longbridge_quote': ('lb_enabled', 'lb_app_key', 'lb_app_secret', 'lb_access_token', 'lb_client_id','lb_overnight_enabled'),
@@ -201,7 +204,15 @@ async def health():
 
 @app.get('/api/status')
 async def status(_auth=Depends(auth)):
-    return {'source_health':[{**r, 'detail': config_store.redact(r['detail'])} for r in engine.db.list_rows('health')],'configured':{
+    accounts = []
+    for account in settings.x_accounts:
+        user = engine.db.x_user(account['username'])
+        cursor = engine.db.x_cursor(user['id'] if user else 'username:'+account['username'].casefold())
+        accounts.append({'configured_username':account['username'],'enabled':settings.x_enabled and account['enabled'],
+                         'user':user,**{k:cursor.get(k) for k in ('initialized','last_success_at','last_post_at','retry_at')},
+                         'error':config_store.redact(cursor.get('error',''))})
+    return {'x_accounts':accounts,'source_health':[{**r, 'detail': config_store.redact(r['detail'])} for r in engine.db.list_rows('health')],'configured':{
+        'x_news':bool(settings.x_enabled and settings.x_bearer_token),
         'alpaca_news':bool(settings.alpaca_news_enabled and settings.alpaca_key and settings.alpaca_secret),
         'longbridge_quote':settings.lb_enabled,'longbridge_news':settings.lb_news_enabled,
         'ai':bool(settings.ai_enabled and settings.ai_key),'notifications':bool(settings.notifications_enabled and (settings.bark_key or (settings.telegram_token and settings.telegram_chat)))}}

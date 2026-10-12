@@ -4,6 +4,8 @@ import hashlib
 import json
 import re
 import time
+import math
+from email.utils import parsedate_to_datetime
 import httpx
 from .settings_store import XAccount
 
@@ -12,6 +14,29 @@ class XAPIError(Exception):
     def __init__(self, kind, status_code=None, retry_at=None):
         self.kind,self.status_code,self.retry_at = kind,status_code,retry_at
         super().__init__(f'X API：{kind}' + (f'（HTTP {status_code}）' if status_code else ''))
+
+
+def retry_delay(error, failures, now):
+    if error.retry_at is not None and math.isfinite(error.retry_at):
+        return max(0,error.retry_at-now)
+    if error.kind in ('authentication','permission','billing'):
+        return 300
+    initial,cap = (30,900) if error.kind == 'rate_limit' else (5,300)
+    return min(cap,initial*2**min(20,max(0,failures-1)))
+
+
+def retry_timestamp(headers, now):
+    values = []
+    raw = headers.get('Retry-After')
+    if raw:
+        try: values.append(now+max(0,float(raw)))
+        except ValueError:
+            try: values.append(parsedate_to_datetime(raw).timestamp())
+            except (ValueError,TypeError,OverflowError): pass
+    try: values.append(float(headers.get('x-rate-limit-reset','nan')))
+    except ValueError: pass
+    valid = [v for v in values if math.isfinite(v) and v>now]
+    return max(valid,default=None)
 
 
 def identity(value):
@@ -36,13 +61,15 @@ class XClient:
             raise XAPIError('network') from exc
         try:
             data = response.json()
-        except ValueError as exc:
-            raise XAPIError('invalid_response',response.status_code) from exc
+        except ValueError:
+            if response.status_code == 200:
+                raise XAPIError('invalid_response',200)
+            data = {}
         if response.status_code != 200:
             kind = {401:'authentication',403:'permission',404:'not_found',402:'billing',429:'rate_limit'}.get(response.status_code,'upstream')
             if response.status_code == 400 and params and params.get('pagination_token') and 'pagination' in json.dumps(data).lower():
                 kind = 'invalid_page_token'
-            raise XAPIError(kind,response.status_code)
+            raise XAPIError(kind,response.status_code,retry_timestamp(response.headers,time.time()) if kind=='rate_limit' else None)
         if not isinstance(data,dict) or data.get('errors'):
             raise XAPIError('partial_response',response.status_code)
         return data
@@ -111,6 +138,7 @@ async def poll_account(engine, client, account, *, now):
     except XAPIError as exc:
         if exc.kind != 'not_found' or not cached: raise
         user = await client.resolve_user_by_id(cached['id'])
+    await asyncio.sleep(0)
     engine.db.save_x_user(user,account['username'])
     state = engine.db.x_cursor(user['id'])
     initial = not state.get('initialized')
@@ -145,3 +173,44 @@ async def poll_account(engine, client, account, *, now):
             state.update(initialized=True,since_id=maximum,batch_since_id=None,batch_max_id=None)
         engine.db.save_x_cursor(user['id'],state)
         if not state['next_token']: break
+
+
+async def poll_round(engine, client, accounts, *, now):
+    for account in accounts:
+        if not account.get('enabled',True): continue
+        user = engine.db.x_user(account['username'])
+        key = user['id'] if user else 'username:'+account['username'].casefold()
+        state = engine.db.x_cursor(key)
+        if state.get('retry_at',0)>now: continue
+        try:
+            await poll_account(engine,client,account,now=now)
+            engine.db.health('x:'+account['username'],'ok','最近轮询成功；无新帖也视为成功')
+        except asyncio.CancelledError: raise
+        except Exception as exc:
+            error = exc if isinstance(exc,XAPIError) else XAPIError('local_storage_or_response')
+            current = engine.db.x_user(account['username'])
+            key = current['id'] if current else key
+            state = engine.db.x_cursor(key)
+            failures = state.get('failures',0)+1
+            hints = {'authentication':'Token 无效或已过期','permission':'权限不足或账号受限',
+                     'billing':'请在 X 开发者控制台检查额度与账单','rate_limit':'达到读取限流；等待供应商恢复',
+                     'network':'网络不可用','not_found':'账号不存在或无法读取'}
+            message = hints.get(error.kind,'读取或归档失败，请稍后重试')
+            state.update(failures=failures,retry_at=now+retry_delay(error,failures,now),error=message)
+            engine.db.save_x_cursor(key,state)
+            engine.db.health('x:'+account['username'],'error',message)
+
+
+async def x_news_loop(engine, settings):
+    if not settings.x_enabled or not settings.x_bearer_token:
+        engine.db.health('x_news','disabled','X 用户言论监控未启用')
+        return
+    client = XClient(settings.x_bearer_token)
+    engine.db.health('x_news','ready','X 用户言论：按配置账号定期读取')
+    try:
+        while True:
+            started = time.monotonic()
+            await poll_round(engine,client,settings.x_accounts,now=time.time())
+            await asyncio.sleep(max(0,settings.x_poll_interval-(time.monotonic()-started)))
+    finally:
+        await client.close()
