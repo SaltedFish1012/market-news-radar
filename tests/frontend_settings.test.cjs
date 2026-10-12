@@ -6,7 +6,7 @@ const fs=require('node:fs');
 const {execFileSync}=require('node:child_process');
 const {JSDOM,VirtualConsole}=require('jsdom');
 const root=require('node:path').resolve(__dirname,'..');
-const python=root+'/.venv/bin/python';
+const python=process.env.RADAR_TEST_PYTHON||root+(process.platform==='win32'?'/.venv/Scripts/python.exe':'/.venv/bin/python');
 function projectJSON(script){return JSON.parse(execFileSync(python,['-c',script],{cwd:root,encoding:'utf8'}));}
 const initial=projectJSON(`import json,tempfile
 from pathlib import Path

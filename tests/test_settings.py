@@ -39,7 +39,8 @@ def test_profiles_persist_independently_without_exposing_credentials(store):
     assert snapshot['revision'] == 2
     assert snapshot['ai_profiles']['gemini']['key_set']
     assert 'private-' not in json.dumps(snapshot)
-    assert os.stat(store.path).st_mode & 0o777 == 0o600
+    if os.name == 'posix':
+        assert os.stat(store.path).st_mode & 0o777 == 0o600
     candidate = restored.prepare(SettingsUpdate(revision=2, values={'ai_provider':'gemini'}))
     assert restored.settings(candidate).ai_key == 'private-gemini-test-key'
 
