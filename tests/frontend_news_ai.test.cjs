@@ -58,3 +58,16 @@ test('analysis counts follow news filters and completed results appear on refres
   assert.deepEqual(app.errors,[]);
  }finally{app.window.close();}
 });
+
+test('malformed enum objects cannot abort rendering other news or count as valid analysis',async()=>{
+ const broken=[{sentiment:{toString:0}},{evidence_level:{toString:0}},{sentiment:['mixed']},{evidence_level:['unverified']}];
+ const rows=broken.map((extra,i)=>news(i+1,{status:'analyzed',ai_json:JSON.stringify({...analysis,...extra})}));
+ rows.push(news(5,{status:'analyzed',ai_json:JSON.stringify(analysis)}));
+ const app=await workspace({url:'http://radar.test/news',newsItems:rows});
+ try{
+  assert.equal(app.document.querySelectorAll('#newsList .news-card').length,5);
+  assert.equal(app.document.querySelectorAll('#newsList .news-ai-analysis.empty').length,4);
+  assert.match(app.document.getElementById('newsAiCounts').textContent,/已分析 1 条/);
+  assert.deepEqual(app.errors,[]);
+ }finally{app.window.close();}
+});

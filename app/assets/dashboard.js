@@ -33,7 +33,7 @@ const aiDirections={positive:'偏正面',negative:'偏负面',mixed:'影响混�
 const aiEvidence={reported:'模型标注：媒体报道',official:'模型标注：官方来源',unverified:'尚未核实'};
 function newsAnalysis(row){
  let value;try{value=typeof row.ai_json==='string'?JSON.parse(row.ai_json):row.ai_json;}catch{return null;}
- if(!value||typeof value!=='object'||Array.isArray(value)||!Object.hasOwn(aiDirections,value.sentiment)||!Object.hasOwn(aiEvidence,value.evidence_level)||!Array.isArray(value.affected_symbols)||!value.affected_symbols.every(s=>typeof s==='string'&&validSymbol(s))||typeof value.rationale!=='string'||typeof value.uncertainty!=='string')return null;
+ if(!value||typeof value!=='object'||Array.isArray(value)||typeof value.sentiment!=='string'||typeof value.evidence_level!=='string'||!Object.hasOwn(aiDirections,value.sentiment)||!Object.hasOwn(aiEvidence,value.evidence_level)||!Array.isArray(value.affected_symbols)||!value.affected_symbols.every(s=>typeof s==='string'&&validSymbol(s))||typeof value.rationale!=='string'||typeof value.uncertainty!=='string')return null;
  return value;
 }
 function renderNewsAnalysis(row){
