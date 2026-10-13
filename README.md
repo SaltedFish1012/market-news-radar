@@ -114,6 +114,7 @@ DOM 测试需要 Node 24.13+，建议 24.19；可用 `RADAR_TEST_PYTHON` 指定�
 侧栏「设置」分为 AI 分析、行情与新闻、推送通知、自选与规则。点击「保存并应用」后即时生效，受影响的采集连接会重新建立，其他来源继续运行。新 RSS 来源首次采集只归档历史文章。
 
 - AI 供应商可选 OpenAI、Google Gemini、Anthropic Claude、OpenAI 兼容接口，提供模型预设和自定义模型 ID。各供应商分别保存模型、地址和密钥；切换供应商不会串用 API Key。
+- 新闻中心每条新闻附有 AI 分析区域，展示影响方向、可能关联标的、模型标注的证据状态、依据和不确定性，保留原文及来源链接。顶部显示启用状态和当前列表的分析数量；空结果或格式异常有明确提示。自动分析只处理开启后符合时效和优先级条件的新消息，历史新闻不会自动补分析。
 - Gemini 使用[原生 generateContent 接口](https://ai.google.dev/api/generate-content)，默认地址 `https://generativelanguage.googleapis.com/v1beta`；Claude 使用原生 Messages；OpenAI 使用 Responses。DeepSeek、OpenRouter 等网关可选「OpenAI 兼容接口」，填写其基础地址与模型 ID。本机无认证服务需要时可填写占位 Key。
 - 「测试 AI 连接」使用当前表单中的 AI 配置发送一条合成消息，验证连接和分析 JSON 格式；不会保存配置，可能产生一次调用费用，也计入本地每小时上限。真实模型权限与额度需用自己的 Key 实测。
 - 可配置默认行情源、Alpaca/长桥、RSS 来源及间隔、SEC 联系标识、Telegram/Bark、新闻关键词、自选股票和价格预警。长桥 OAuth 仍需在本机先完成授权，且需安装可选 SDK。
